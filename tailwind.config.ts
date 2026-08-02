@@ -67,10 +67,25 @@ const config: Config = {
         drawer: "var(--z-drawer)",
         modal: "var(--z-modal)",
         toast: "var(--z-toast)",
+        tooltip: "var(--z-tooltip)",
+      },
+      keyframes: {
+        shimmer: {
+          "0%": { backgroundPosition: "200% 0" },
+          "100%": { backgroundPosition: "-200% 0" },
+        },
+        "scan-line": {
+          "0%": { transform: "translateY(-100%)" },
+          "100%": { transform: "translateY(100%)" },
+        },
+      },
+      animation: {
+        shimmer: "shimmer 1.3s ease-in-out infinite",
+        "scan-line": "scan-line 1.8s ease-in-out infinite",
       },
     },
   },
-  plugins: [],
+  plugins: [require("tailwindcss-animate")],
 };
 
 export default config;

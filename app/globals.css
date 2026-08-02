@@ -51,6 +51,7 @@
   --z-drawer: 60;
   --z-modal: 70;
   --z-toast: 80;
+  --z-tooltip: 90;
 }
 /* Back-compat aliases so existing component rules (pre-redesign) stay theme-agnostic
    until each component is migrated to Tailwind utility classes. */
