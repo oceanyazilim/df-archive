@@ -66,17 +66,14 @@ export function OceanLogoScene({ mode, reducedMotion, progress01, searchSubstage
         break;
       }
       case "distributor-search": {
-        // Faster rotation with a small periodic reverse micro-correction, plus a slight Z tilt —
-        // calms as the sub-stage approaches a result (confidence), settles front-on at completion.
+        // Clean, steady rotation — faster while actively searching, calming
+        // as the sub-stage approaches a result, settling front-on at completion.
         if (searchSubstage === "complete") {
-          g.rotation.y *= 0.88;
-          g.rotation.z *= 0.88;
+          g.rotation.y *= 0.9;
           break;
         }
-        const speed = searchSubstage === "confidence" ? 0.35 : 0.9;
-        const dir = Math.sin(t * 0.35) > 0.85 ? -1 : 1;
-        g.rotation.y += delta * speed * dir;
-        g.rotation.z = Math.sin(t * 0.8) * (searchSubstage === "confidence" ? 0.015 : 0.05);
+        const speed = searchSubstage === "confidence" ? 0.32 : 0.75;
+        g.rotation.y += delta * speed;
         break;
       }
       case "catalog-analysis": {

@@ -2,20 +2,20 @@
 
 import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "../../lib/cn";
 import { useWebglSupport } from "../../lib/hooks/useWebglSupport";
 import { usePageVisible } from "../../lib/hooks/usePageVisible";
 import { GlbErrorBoundary } from "./GlbErrorBoundary";
 import { OceanLogoScene } from "./OceanLogoScene";
 import { OceanLogoFallback } from "./OceanLogoFallback";
-import { OrbitEffect } from "./OrbitEffect";
-import { ScanEffect } from "./ScanEffect";
 import { OceanProgressBar } from "./OceanProgressBar";
 import { LoaderStageList } from "./LoaderStageList";
 import type { Ocean3DLoaderProps } from "./types";
 
-const SIZE = { fullscreen: "clamp(220px, 34vh, 360px)", compact: "84px", inline: "150px" } as const;
+// Bigger and more prominent while an actual query is running — no orbit
+// rings or particle effects anymore, just the model, clean and centered.
+const SIZE = { fullscreen: "clamp(240px, 38vh, 400px)", compact: "104px", inline: "230px" } as const;
 
 function sceneHeight(props: Pick<Ocean3DLoaderProps, "fullscreen" | "compact">): string {
   if (props.fullscreen) return SIZE.fullscreen;
@@ -36,9 +36,9 @@ function progress01Of(progress: Ocean3DLoaderProps["progress"]): number {
 }
 
 /**
- * The shared 3D brand-loader shell. Canvas + camera + studio lighting +
- * OceanLogoScene (+ per-mode OrbitEffect/ScanEffect), with a graceful
- * WebGL/GLB-failure fallback to the static logo — and the progress bar /
+ * The shared 3D brand-loader shell — the model itself, entering with a clean
+ * fade + scale motion and a simple rotation, nothing orbiting around it. A
+ * graceful WebGL/GLB-failure fallback to the static logo; the progress bar /
  * stage list / live stats never depend on the 3D scene succeeding.
  */
 export function Ocean3DLoader({
@@ -50,8 +50,6 @@ export function Ocean3DLoader({
   const height = sceneHeight({ fullscreen, compact });
   const useFallback = webglSupported === false;
   const p01 = progress01Of(progress);
-  const showScanEffect = mode === "distributor-search" && !reducedMotion;
-  const showOrbitEffect = mode === "distributor-search" || mode === "catalog-analysis" || mode === "success";
 
   const statLine =
     mode === "catalog-analysis" && catalogStats && (catalogStats.releases != null || catalogStats.tracks != null)
@@ -64,7 +62,16 @@ export function Ocean3DLoader({
 
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      <div className="relative w-full" style={{ height }} role="img" aria-label={MODE_ARIA_TEXT[mode]}>
+      <motion.div
+        key={mode}
+        initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.45, ease: [0.22, 0.8, 0.36, 1] }}
+        className="relative w-full"
+        style={{ height }}
+        role="img"
+        aria-label={MODE_ARIA_TEXT[mode]}
+      >
         {useFallback ? (
           <OceanLogoFallback size={compact ? 72 : 140} className="h-full" />
         ) : (
@@ -81,13 +88,11 @@ export function Ocean3DLoader({
                 <directionalLight position={[2.4, 3, 2.6]} intensity={1.1} color="#F4F7FB" />
                 <directionalLight position={[-2.2, -1, -2.4]} intensity={0.65} color="#39BDF8" />
                 <OceanLogoScene mode={mode} reducedMotion={reducedMotion} progress01={p01} searchSubstage={searchSubstage} />
-                {showOrbitEffect && <OrbitEffect mode={mode} reducedMotion={reducedMotion} progress01={p01} searchSubstage={searchSubstage} />}
-                {showScanEffect && <ScanEffect reducedMotion={reducedMotion} />}
               </Canvas>
             </Suspense>
           </GlbErrorBoundary>
         )}
-      </div>
+      </motion.div>
 
       {(stage || description) && (
         <div className="mt-3 text-center">
