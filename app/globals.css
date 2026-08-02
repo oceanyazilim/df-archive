@@ -1,32 +1,59 @@
-/* ---- Design tokens: SINGLE pure-black theme. Never hardcode colors in components. ----
-   Background is 100% black; surfaces are translucent white overlays (transparent,
-   minimal cards); text is white. There is no light mode. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Design tokens: premium dark theme. Never hardcode colors in components. ----
+   Solid charcoal surfaces (not translucent-on-black), thin low-opacity borders,
+   ocean-blue accent. There is no light mode. */
 :root, :root[data-theme="dark"] {
-  --background: #000000;
-  --sidebar: #000000;
-  --header: #000000;
-  --surface: rgba(255, 255, 255, 0.025);
-  --surface-raised: rgba(255, 255, 255, 0.05);
-  --surface-hover: rgba(255, 255, 255, 0.08);
+  --background: #080B0F;
+  --sidebar: #0B0F14;
+  --header: rgba(14, 18, 24, 0.88);
+  --surface: #11161D;
+  --surface-raised: #151B23;
+  --surface-hover: #171D26;
+  --input-bg: #0D1218;
   --border: rgba(255, 255, 255, 0.12);
   --border-subtle: rgba(255, 255, 255, 0.07);
-  --text-primary: #FFFFFF;
-  --text-secondary: #C8C8C8;
-  --text-muted: #8A8A8A;
-  --accent: #20C997;
-  --accent-hover: #18AD81;
-  --success: #38C98B;
-  --warning: #D9A441;
-  --danger: #F06A61;
-  --focus-ring: rgba(32, 201, 151, 0.25);
-  --on-accent: #04140d;
-  --chart-primary: #4C8DD6;
-  --chart-secondary: #20C997;
-  --accent-dim: rgba(32, 201, 151, 0.12);
-  --skeleton-hi: rgba(255, 255, 255, 0.10);
-  --shadow: 0 10px 28px rgba(0,0,0,0.6);
+  --text-primary: #F4F7FB;
+  --text-secondary: #919AAA;
+  --text-muted: #626C7A;
+  --accent: #39BDF8;
+  --accent-hover: #1578FF;
+  --accent-secondary: #1578FF;
+  --accent-purple: #8B7CFF;
+  --success: #36D67E;
+  --warning: #F5B94C;
+  --danger: #FF647C;
+  --focus-ring: rgba(57, 189, 248, 0.28);
+  --on-accent: #04141C;
+  --chart-primary: #39BDF8;
+  --chart-secondary: #1578FF;
+  --accent-dim: rgba(57, 189, 248, 0.12);
+  --skeleton-hi: rgba(255, 255, 255, 0.08);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.6);
+  --radius: 10px;
+  --radius-sm: 7px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 280ms;
+  --ease-out: cubic-bezier(0.22, 0.8, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --sidebar-width: 264px;
+  --sidebar-width-collapsed: 72px;
+  --header-height: 64px;
+  --z-topbar: 20;
+  --z-dropdown: 50;
+  --z-drawer: 60;
+  --z-modal: 70;
+  --z-toast: 80;
 }
-/* Back-compat aliases so component rules stay theme-agnostic. */
+/* Back-compat aliases so existing component rules (pre-redesign) stay theme-agnostic
+   until each component is migrated to Tailwind utility classes. */
 :root {
   --bg: var(--background);
   --card: var(--surface);
@@ -37,9 +64,7 @@
   --muted: var(--text-muted);
   --positive: var(--success);
   --error: var(--danger);
-  --radius: 11px;
-  --radius-sm: 8px;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 body { transition: background-color 0.15s ease, color 0.15s ease; }
 * { box-sizing: border-box; }
