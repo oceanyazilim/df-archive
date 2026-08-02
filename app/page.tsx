@@ -10,12 +10,12 @@ import { Skeleton } from "./components/shared/Skeleton";
 import { ErrorState } from "./components/shared/ErrorState";
 import { SpotifyUrlInput } from "./components/analyzer/SpotifyUrlInput";
 import { AnalysisProgress } from "./components/analyzer/AnalysisProgress";
-import { CatalogDashboard } from "./components/dashboard/CatalogDashboard";
-import { OceanAnalyzerPage } from "./components/analyzer-details/OceanAnalyzerPage";
+import { ArtistWorkspace } from "./components/dashboard/ArtistWorkspace";
+import { OceanAnalyzerPage, type AnalyzerTarget } from "./components/analyzer-details/OceanAnalyzerPage";
 import { parseMusicLookupInput } from "@core/validation/musicInput";
 import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
-import { ArtistCatalogWorkspace, ArtistCatalogData } from "./components/ArtistCatalog";
+import type { ArtistCatalogData } from "./components/ArtistCatalog";
 import { HistoryView } from "./components/views/HistoryView";
 import { DistributorsView, ArtistsView, AlbumsView, TracksView } from "./components/views/catalog";
 import { AnalyticsView } from "./components/views/AnalyticsView";
@@ -54,6 +54,7 @@ export default function Page() {
   const [step, setStep] = useState(0);
   const [stageList, setStageList] = useState<string[]>(RELEASE_STEPS);
   const [toast, setToast] = useState<string | null>(null);
+  const [analyzerTarget, setAnalyzerTarget] = useState<AnalyzerTarget | null>(null);
   const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), 1500); }, []);
   // `analyze` is defined below; the URL-restore effect needs it without
   // re-running whenever its identity changes.
@@ -151,6 +152,7 @@ export default function Page() {
   analyzeRef.current = analyze;
 
   const go = useCallback((v: View) => { setView(v); setDrawer(false); }, []);
+  const openAnalyzer = useCallback((target: AnalyzerTarget) => { setAnalyzerTarget(target); go("analyzer"); }, [go]);
 
   return (
     <TooltipProvider>
@@ -184,6 +186,7 @@ export default function Page() {
                   session={session} artist={artist} running={running} step={step} stageList={stageList} error={error}
                   flash={flash} onAnalyze={analyze}
                   onOpenSettings={() => go("settings")} onOpenReports={() => go("reports")} onOpenHistory={() => go("history")}
+                  onOpenAnalyzer={openAnalyzer}
                   health={health}
                 />
               )}
@@ -195,7 +198,7 @@ export default function Page() {
               {view === "tracks" && <TracksView onAnalyze={analyze} />}
               {view === "analytics" && <AnalyticsView onAnalyze={analyze} />}
               {view === "reports" && <ReportsView />}
-              {view === "analyzer" && <OceanAnalyzerPage />}
+              {view === "analyzer" && <OceanAnalyzerPage initialTarget={analyzerTarget} />}
               {view === "status" && <SystemStatusView health={health} />}
               {view === "settings" && <SettingsView health={health} />}
             </div>
@@ -230,12 +233,12 @@ function SpotifyCooldownBanner({ ms }: { ms: number }) {
 }
 
 /** The Dashboard view: landing hero (no session) or the release workspace. */
-function LookupView({ session, artist, running, step, stageList, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, health }: {
+function LookupView({ session, artist, running, step, stageList, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, onOpenAnalyzer, health }: {
   session: Session | null;
   artist: { loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null;
   running: boolean; step: number; stageList: string[]; error: string | null;
   flash: (m: string) => void; onAnalyze: (input: string) => void; onOpenSettings: () => void;
-  onOpenReports: () => void; onOpenHistory: () => void; health: Health | null;
+  onOpenReports: () => void; onOpenHistory: () => void; onOpenAnalyzer: (target: AnalyzerTarget) => void; health: Health | null;
 }) {
   // Artist catalogue takes over the view when an artist link was analyzed.
   if (artist) {
@@ -261,16 +264,15 @@ function LookupView({ session, artist, running, step, stageList, error, flash, o
       );
     }
     return (
-      <div className="space-y-6">
-        <CatalogDashboard
-          data={artist.data}
-          fetchedAt={artist.fetchedAt}
-          onReanalyze={() => onAnalyze(artist.data!.spotifyUrl)}
-          onExport={onOpenReports}
-          onOpenHistory={onOpenHistory}
-        />
-        <ArtistCatalogWorkspace data={artist.data} flash={flash} onAnalyze={onAnalyze} onOpenSettings={onOpenSettings} />
-      </div>
+      <ArtistWorkspace
+        data={artist.data}
+        fetchedAt={artist.fetchedAt}
+        onReanalyze={() => onAnalyze(artist.data!.spotifyUrl)}
+        onExport={onOpenReports}
+        onOpenHistory={onOpenHistory}
+        onOpenAnalyzer={onOpenAnalyzer}
+        flash={flash}
+      />
     );
   }
 

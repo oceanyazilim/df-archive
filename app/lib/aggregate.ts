@@ -8,6 +8,8 @@
  */
 
 import type { CatalogTrack } from "../components/ArtistCatalog";
+import type { Resolved } from "./hooks/useArtistCatalog";
+import type { DistributorSlice } from "../components/dashboard/DistributorBreakdown";
 
 export interface MonthBucket {
   key: string; // "2025-03"
@@ -146,6 +148,18 @@ export function catalogTimeline(tracks: CatalogTrack[], max = 8): TimelineEntry[
     sub: new Date(r.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }),
     kind: i === 0 ? "first" : i === pick.length - 1 ? "latest" : "release",
   }));
+}
+
+/** Distinct resolved distributor names across the catalog, by track count — powers the dashboard donut + ArtistSummary's primary distributor. */
+export function resolvedDistributorBreakdown(resolved: Record<string, Resolved>): DistributorSlice[] {
+  const counts = new Map<string, number>();
+  for (const r of Object.values(resolved)) {
+    if (r.status !== "done" || !r.distributor) continue;
+    counts.set(r.distributor, (counts.get(r.distributor) ?? 0) + 1);
+  }
+  return Array.from(counts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export function catalogDateRange(tracks: CatalogTrack[]): { first: string | null; last: string | null } {
