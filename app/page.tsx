@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Sidebar } from "./components/Sidebar";
-import { Topbar } from "./components/Topbar";
+import { AppSidebar } from "./components/layout/AppSidebar";
+import { TopNavigation } from "./components/layout/TopNavigation";
+import { MobileNavigation } from "./components/layout/MobileNavigation";
+import { PageContainer } from "./components/layout/PageContainer";
+import { TooltipProvider } from "./components/shared/Tooltip";
 import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
 import { ArtistCatalogWorkspace, ArtistCatalogData } from "./components/ArtistCatalog";
@@ -27,9 +30,22 @@ const VIEW_TITLE: Record<View, string> = {
 
 export default function Page() {
   const [view, setView] = useState<View>("lookup");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [health, setHealth] = useState<Health | null>(null);
+  const [lastHealthAt, setLastHealthAt] = useState<number | null>(null);
+
+  // Sidebar collapse state persists across sessions (read after mount to avoid SSR mismatch).
+  useEffect(() => {
+    try { if (window.localStorage.getItem("ocean:sidebar-collapsed") === "1") setCollapsedState(true); } catch { /* ignore */ }
+  }, []);
+  const setCollapsed = useCallback((updater: boolean | ((c: boolean) => boolean)) => {
+    setCollapsedState((prev) => {
+      const next = typeof updater === "function" ? (updater as (c: boolean) => boolean)(prev) : updater;
+      try { window.localStorage.setItem("ocean:sidebar-collapsed", next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   const [session, setSession] = useState<Session | null>(null);
   const [artist, setArtist] = useState<{ loading: boolean; data: ArtistCatalogData | null; error: string | null } | null>(null);
   const [running, setRunning] = useState(false);
@@ -41,7 +57,12 @@ export default function Page() {
   // re-running whenever its identity changes.
   const analyzeRef = useRef<((input: string) => void) | null>(null);
 
-  useEffect(() => { const f = () => jget<Health>("/api/health").then(setHealth).catch(() => {}); f(); const t = setInterval(f, 10000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    const f = () => jget<Health>("/api/health").then((h) => { setHealth(h); setLastHealthAt(Date.now()); }).catch(() => {});
+    f();
+    const t = setInterval(f, 10000);
+    return () => clearInterval(t);
+  }, []);
 
   // Restore a session from the URL on first load. Two forms are accepted:
   //   ?album={id}&track={id}  — an exact album workspace (internal links)
@@ -128,37 +149,51 @@ export default function Page() {
   const go = useCallback((v: View) => { setView(v); setDrawer(false); }, []);
 
   return (
-    <div className="app">
-      <BackgroundFX />
-      {drawer && <div className="scrim" onClick={() => setDrawer(false)} />}
-      <Sidebar view={view} onNavigate={go} collapsed={collapsed} drawerOpen={drawer} health={health} />
-
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <Topbar
-          onCollapse={() => (window.innerWidth <= 720 ? setDrawer(true) : setCollapsed((c) => !c))}
-          onAnalyze={analyze} running={running} health={health} onNavigate={go}
+    <TooltipProvider>
+      <div className="relative min-h-screen bg-background">
+        <BackgroundFX />
+        <MobileNavigation open={drawer} onClose={() => setDrawer(false)} />
+        <AppSidebar
+          view={view}
+          onNavigate={go}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setCollapsed((c) => !c)}
+          drawerOpen={drawer}
+          health={health}
+          lastHealthAt={lastHealthAt}
         />
-        <main className="content" key={view}>
-          {health?.spotifyCooldown?.active && <SpotifyCooldownBanner ms={health.spotifyCooldown.remainingMs} />}
-          <div className="view-anim">
-            {view === "lookup" && (
-              <LookupView session={session} artist={artist} running={running} step={step} error={error} flash={flash} onAnalyze={analyze} onOpenSettings={() => go("settings")} health={health} />
-            )}
-            {view === "history" && <HistoryView onAnalyze={analyze} />}
-            {view === "uuid" && <UuidDirectoryView flash={flash} />}
-            {view === "distributors" && <DistributorsView flash={flash} />}
-            {view === "artists" && <ArtistsView />}
-            {view === "albums" && <AlbumsView onAnalyze={analyze} />}
-            {view === "tracks" && <TracksView onAnalyze={analyze} />}
-            {view === "analytics" && <AnalyticsView onAnalyze={analyze} />}
-            {view === "reports" && <ReportsView />}
-            {view === "status" && <SystemStatusView health={health} />}
-            {view === "settings" && <SettingsView health={health} />}
-          </div>
-        </main>
+
+        <div className={`relative flex min-h-screen flex-col ml-0 transition-[margin] duration-base ease-out ${collapsed ? "lg:ml-[72px]" : "lg:ml-[264px]"}`}>
+          <TopNavigation
+            view={view}
+            onToggleSidebar={() => (window.innerWidth < 1024 ? setDrawer(true) : setCollapsed((c) => !c))}
+            onAnalyze={analyze}
+            running={running}
+            health={health}
+            onNavigate={go}
+          />
+          <PageContainer key={view}>
+            {health?.spotifyCooldown?.active && <SpotifyCooldownBanner ms={health.spotifyCooldown.remainingMs} />}
+            <div className="view-anim">
+              {view === "lookup" && (
+                <LookupView session={session} artist={artist} running={running} step={step} error={error} flash={flash} onAnalyze={analyze} onOpenSettings={() => go("settings")} health={health} />
+              )}
+              {view === "history" && <HistoryView onAnalyze={analyze} />}
+              {view === "uuid" && <UuidDirectoryView flash={flash} />}
+              {view === "distributors" && <DistributorsView flash={flash} />}
+              {view === "artists" && <ArtistsView />}
+              {view === "albums" && <AlbumsView onAnalyze={analyze} />}
+              {view === "tracks" && <TracksView onAnalyze={analyze} />}
+              {view === "analytics" && <AnalyticsView onAnalyze={analyze} />}
+              {view === "reports" && <ReportsView />}
+              {view === "status" && <SystemStatusView health={health} />}
+              {view === "settings" && <SettingsView health={health} />}
+            </div>
+          </PageContainer>
+        </div>
+        {toast && <div className="toast anim-pop">{toast}</div>}
       </div>
-      {toast && <div className="toast anim-pop">{toast}</div>}
-    </div>
+    </TooltipProvider>
   );
 }
 
