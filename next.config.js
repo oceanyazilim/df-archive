@@ -10,6 +10,16 @@ const nextConfig = {
       "/api/**": ["./json/**"],
     },
   },
+  webpack(config) {
+    // Serve the 3D brand asset (src/assets/Ocean-3D-LOGO.glb) as a resolved
+    // URL at build time, the Next.js/webpack equivalent of Vite's `?url`
+    // imports — the file stays under src/assets/, nothing moves to public/.
+    config.module.rules.push({
+      test: /\.glb$/,
+      type: "asset/resource",
+    });
+    return config;
+  },
 };
 
 module.exports = nextConfig;

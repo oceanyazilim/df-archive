@@ -33,15 +33,9 @@ export function AppSidebar({ view, onNavigate, collapsed, onToggleCollapsed, dra
         drawerOpen && "max-lg:translate-x-0"
       )}
     >
-      <div className={cn("flex items-center gap-2 px-4 pb-3 pt-4", collapsed && "justify-center px-0")}>
-        <div className="min-w-0 flex-1">
-          <BrandLogo variant={collapsed ? "collapsedSidebar" : "sidebar"} />
-        </div>
-        {!collapsed && (
-          <span className="shrink-0 rounded-full border border-border-strong bg-card-elevated px-2 py-0.5 text-[10px] font-medium text-foreground-muted">
-            Analyzer v4
-          </span>
-        )}
+      {/* Logo only in the top-left brand row — no wordmark, no badge text. */}
+      <div className={cn("flex items-center px-4 pb-3 pt-4", collapsed && "justify-center px-0")}>
+        <BrandLogo variant={collapsed ? "collapsedSidebar" : "sidebar"} />
       </div>
 
       <button

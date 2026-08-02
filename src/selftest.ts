@@ -627,21 +627,20 @@ async function main(): Promise<void> {
   const brandLogo = read("app/components/BrandLogo.tsx");
   const globals = read("app/globals.css");
   const pageSrc = read("app/page.tsx");
-  // 1) BrandLogo is the ONLY file importing the two logo PNGs (no duplicate imports).
-  const importsInBrandLogo = /white-virus-logo\.png/.test(brandLogo) && /black-virus-logo\.png/.test(brandLogo);
-  assert(importsInBrandLogo, "BrandLogo imports both logo PNGs");
-  assert(!/virus-logo\.png/.test(pageSrc), "page.tsx does NOT import a logo PNG directly");
+  // 1) BrandLogo is the ONLY file importing the static logo PNG (no duplicate imports).
+  // The redesign replaced the theme-paired virus logos with a single static
+  // Ocean-Logo.png brand mark (no light/dark switching — this app is dark-only).
+  assert(/Ocean-Logo\.png/.test(brandLogo), "BrandLogo imports the Ocean logo PNG");
+  assert(!/Ocean-Logo\.png/.test(pageSrc), "page.tsx does NOT import the logo PNG directly");
   for (const f of fs.readdirSync("app/components").filter((n) => n.endsWith(".tsx") && n !== "BrandLogo.tsx")) {
-    assert(!/virus-logo\.png/.test(read(`app/components/${f}`)), `${f} does NOT import a logo PNG directly`);
+    assert(!/Ocean-Logo\.png/.test(read(`app/components/${f}`)), `${f} does NOT import the logo PNG directly`);
   }
-  // 2) EXACTLY ONE <img> is rendered, and the src is chosen by resolved theme
-  //    (dark -> white, light -> black). No two-image CSS toggle.
+  // 2) EXACTLY ONE <img> is rendered — image only, no wordmark/text recreation.
   eq((brandLogo.match(/<img\s/g) || []).length, 1, "BrandLogo renders exactly one <img> element");
-  assert(/theme === "dark" \? whiteLogo\.src : blackLogo\.src/.test(brandLogo), "src selected by theme: dark->white, light->black");
-  assert(/dataset\.theme === "light" \? "light" : "dark"/.test(brandLogo), "resolves theme from data-theme (system resolved)");
+  assert(!/Ocean Distro Finder<\/span>|<span[\s\S]{0,80}Ocean Distro Finder/.test(brandLogo), "logo is image-only — no recreated wordmark text inside BrandLogo");
   assert(!/logo-for-dark|logo-for-light/.test(brandLogo) && !/logo-for-dark|logo-for-light/.test(globals), "no two-image CSS toggle remains");
-  assert(!/filter:\s*invert|filter:\s*brightness|filter:\s*hue/.test(brandLogo) && !/\.brand[\s\S]{0,200}filter:\s*invert/.test(globals), "no CSS-filter recoloring of the logo");
-  assert(/object-fit:\s*contain/.test(globals) || /objectFit:\s*"contain"/.test(brandLogo), "logo uses object-fit: contain");
+  assert(!/filter:\s*invert|filter:\s*brightness|filter:\s*hue/.test(brandLogo) && !/\.brand[\s\S]{0,200}filter:\s*invert/.test(globals), "no permanent CSS-filter recoloring of the logo (a hover-only brightness lift is fine)");
+  assert(/object-contain/.test(brandLogo) || /object-fit:\s*contain/.test(globals), "logo uses object-contain");
   // 3) Approved locations: exactly ONE BrandLogo (sidebar) — no center/empty-state duplicate.
   // Sidebar rendering moved to app/components/layout/AppSidebar.tsx during the UI redesign.
   const sidebarSrc = read("app/components/layout/AppSidebar.tsx");
