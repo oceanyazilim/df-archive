@@ -1,7 +1,7 @@
 import type { View } from "../../lib/types";
 import {
   LayoutDashboard, ScanSearch, History, Users, Disc3, Music2, Building2,
-  Activity, KeyRound, Download, HeartPulse, Settings2,
+  Activity, KeyRound, Download, HeartPulse, Settings2, Telescope,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -47,6 +47,7 @@ export const NAV: NavSection[] = [
   {
     section: "Tools",
     items: [
+      { view: "analyzer", label: "Ocean Analyzer", icon: Telescope },
       { view: "uuid", label: "UUID Database", icon: KeyRound },
       { view: "reports", label: "Export Center", icon: Download },
     ],
@@ -70,6 +71,7 @@ export const VIEW_TITLE: Record<View, string> = {
   tracks: "Tracks",
   analytics: "Performance",
   reports: "Export Center",
+  analyzer: "Ocean Analyzer",
   status: "API Status",
   settings: "Settings",
 };
@@ -84,6 +86,7 @@ export const VIEW_SECTION: Record<View, string> = {
   tracks: "Catalog",
   analytics: "Analytics",
   reports: "Tools",
+  analyzer: "Tools",
   status: "System",
   settings: "System",
 };

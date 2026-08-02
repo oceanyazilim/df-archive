@@ -7,6 +7,7 @@ export type View =
   | "lookup" | "history"
   | "uuid" | "distributors" | "artists" | "albums" | "tracks"
   | "analytics" | "reports"
+  | "analyzer"
   | "status" | "settings";
 
 export type SourceState = "operational" | "not_configured" | "failed" | "not_found" | "plan_restricted" | "not_applicable";

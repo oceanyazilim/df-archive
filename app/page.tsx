@@ -11,6 +11,7 @@ import { ErrorState } from "./components/shared/ErrorState";
 import { SpotifyUrlInput } from "./components/analyzer/SpotifyUrlInput";
 import { AnalysisProgress } from "./components/analyzer/AnalysisProgress";
 import { CatalogDashboard } from "./components/dashboard/CatalogDashboard";
+import { OceanAnalyzerPage } from "./components/analyzer-details/OceanAnalyzerPage";
 import { parseMusicLookupInput } from "@core/validation/musicInput";
 import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
@@ -194,6 +195,7 @@ export default function Page() {
               {view === "tracks" && <TracksView onAnalyze={analyze} />}
               {view === "analytics" && <AnalyticsView onAnalyze={analyze} />}
               {view === "reports" && <ReportsView />}
+              {view === "analyzer" && <OceanAnalyzerPage />}
               {view === "status" && <SystemStatusView health={health} />}
               {view === "settings" && <SettingsView health={health} />}
             </div>
