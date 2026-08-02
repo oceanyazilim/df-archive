@@ -97,7 +97,15 @@ export function OceanLogoScene({ mode, reducedMotion, progress01, searchSubstage
   return (
     <group ref={groupRef}>
       <group scale={fit.scale}>
-        <primitive object={cloned} position={[-fit.center.x, -fit.center.y, -fit.center.z]} />
+        {/*
+          dispose={null}: SkeletonUtils.clone() clones the node hierarchy but
+          not the geometries/materials — those references are still owned by
+          drei's useGLTF cache and shared with every other loader instance.
+          Without this, R3F's default auto-dispose-on-unmount would free
+          those shared resources the moment ANY one loader instance
+          unmounts, breaking every other concurrently-mounted loader.
+        */}
+        <primitive object={cloned} position={[-fit.center.x, -fit.center.y, -fit.center.z]} dispose={null} />
       </group>
     </group>
   );
