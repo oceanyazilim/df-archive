@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="popup.css" />
+  <title>Spotify Distributor Connector</title>
+</head>
+<body>
+  <header>
+    <div class="brand">Spotify Distributor Connector</div>
+    <label class="switch"><input type="checkbox" id="enabled" /><span>Enabled</span></label>
+  </header>
+
+  <section class="row"><span class="k">Panel</span><span class="v mono" id="panelOrigin">—</span></section>
+  <section class="row"><span class="k">Pairing</span><span class="v" id="paired">—</span></section>
+  <section class="row"><span class="k">Spotify tab</span><span class="v" id="spotifyTab">—</span></section>
+  <section class="row"><span class="k">Delivery</span><span class="v" id="delivery">—</span></section>
+
+  <section class="card">
+    <div class="card-title">Last captured track</div>
+    <div id="lastCapture" class="muted">Nothing captured yet.</div>
+  </section>
+  <section class="card">
+    <div class="card-title">Last result</div>
+    <div id="lastResult" class="muted">—</div>
+  </section>
+
+  <footer>
+    <button id="openPanel" class="btn">Open panel</button>
+    <button id="options" class="btn">Options</button>
+    <button id="disconnect" class="btn danger">Disconnect</button>
+  </footer>
+  <p class="note">Never collects Spotify tokens, cookies, or account data.</p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

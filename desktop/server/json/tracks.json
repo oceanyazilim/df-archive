@@ -1,0 +1,23 @@
+[
+  {
+    "_note": "Authorized Spotify-track/ISRC -> licensor UUID catalog. spotifyTrackId is case-sensitive base62; isrc is case-insensitive. licensorUuid must exist in uuid's.json. Add authorized tracks here.",
+    "spotifyTrackId": "5MH8rf9BdkrFlBEeaYkFZ3",
+    "isrc": "FRX282689836",
+    "licensorUuid": "c71b29ea9e1e48c6931da2dd7c0bf5d5"
+  },
+  {
+    "spotifyTrackId": "EXAMPLEtrackID00000001",
+    "isrc": "USEXA0000001",
+    "licensorUuid": "ede63b46782e46e19045255f32c0ff0f"
+  },
+  {
+    "spotifyTrackId": "EXAMPLEtrackID00000002",
+    "isrc": "USEXA0000002",
+    "licensorUuid": "a830a34f35844bd784eac9a7fb395996"
+  },
+  {
+    "spotifyTrackId": "EXAMPLEtrackID00000003",
+    "isrc": "USEXA0000003",
+    "licensorUuid": "18fbcef4fb624fc58d4a7fdd230bd523"
+  }
+]

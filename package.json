@@ -1,0 +1,37 @@
+{
+  "name": "distro-finder",
+  "version": "1.0.0",
+  "description": "Distributor identification web panel — licensor UUID matching.",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "ts-node --project tsconfig.core.json src/selftest.ts",
+    "lib:demo": "ts-node --project tsconfig.core.json src/demo.ts",
+    "desktop:prepare": "next build && node desktop/scripts/prepare.mjs",
+    "desktop:start": "npm --prefix desktop start",
+    "desktop:dist": "npm --prefix desktop run dist",
+    "spicetify:install": "node desktop/scripts/install-spicetify.mjs"
+  },
+  "engines": {
+    "node": ">=18.18"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}

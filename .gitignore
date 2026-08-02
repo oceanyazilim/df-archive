@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.next/
+out/
+*.log
+.env
+.env.local
+.env.*.local
+.env.local.*.bak
+*.pem
+*.key
+credentials.json
+secrets.json
+next-env.d.ts
+.DS_Store
+.data/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+# Do NOT ignore .env.example (it is a safe template)
+!.env.example

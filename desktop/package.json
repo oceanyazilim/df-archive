@@ -1,0 +1,49 @@
+{
+  "name": "distro-finder-desktop",
+  "version": "1.0.0",
+  "description": "Ocean Distro Finder — desktop app. Electron shell around the Next.js panel; track data arrives from the Spotify desktop client via the Spicetify companion.",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "prepare-server": "node scripts/prepare.mjs",
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^34.5.8",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.ocean.distrofinder",
+    "productName": "Ocean Distro Finder",
+    "files": [
+      "main.js",
+      "spotify-bridge.js"
+    ],
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server"
+      },
+      {
+        "from": "../spicetify",
+        "to": "spicetify"
+      },
+      {
+        "from": "scripts/install-spicetify.mjs",
+        "to": "scripts/install-spicetify.mjs"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

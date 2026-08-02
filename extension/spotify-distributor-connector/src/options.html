@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="options.css" />
+  <title>Connector Options</title>
+</head>
+<body>
+  <main>
+    <h1>Spotify Distributor Connector</h1>
+    <p class="sub">Configure the panel this connector may send sanitized metadata to, and pair with it.</p>
+
+    <section class="card">
+      <h2>Panel origin</h2>
+      <p class="hint">Loopback HTTP (127.0.0.1 / localhost) or HTTPS only. No path.</p>
+      <div class="row">
+        <input id="panelOrigin" type="text" placeholder="http://127.0.0.1:3000" />
+        <button id="saveOrigin" class="btn">Save</button>
+      </div>
+      <div id="originMsg" class="msg"></div>
+    </section>
+
+    <section class="card">
+      <h2>Pairing</h2>
+      <p class="hint">In the panel, open the connector section and click “Generate pairing code”, then enter it here.</p>
+      <div class="row">
+        <input id="code" type="text" placeholder="Pairing code" maxlength="16" />
+        <button id="pair" class="btn primary">Pair</button>
+      </div>
+      <div id="pairMsg" class="msg"></div>
+      <div class="row" style="margin-top:10px">
+        <span class="k">Status:</span> <span id="paired" class="v">—</span>
+        <button id="disconnect" class="btn danger">Disconnect</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Automatic capture</h2>
+      <label class="switch"><input type="checkbox" id="autoCapture" />
+        Forward captures even when no lookup is pending (off by default)</label>
+    </section>
+
+    <p class="note">This connector never reads or sends Spotify tokens, cookies, headers, or account data. The connector key only authorizes delivery to your panel; it is not a Spotify token.</p>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+{
+  "manifest_version": 3,
+  "name": "Ocean Analyzer for Spotify",
+  "version": "1.1.0",
+  "description": "Adds \"Analyze with Ocean Analyzer\" to Spotify Web Player: distributor, metadata and real streaming analytics in a modal, without leaving Spotify. Never touches tokens, cookies, or auth.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage", "alarms", "tabs"],
+  "host_permissions": [
+    "https://open.spotify.com/*",
+    "https://accounts.spotify.com/*",
+    "http://127.0.0.1:3000/*",
+    "http://127.0.0.1:3001/*",
+    "http://localhost:3000/*",
+    "http://localhost:3001/*"
+  ],
+  "externally_connectable": {
+    "matches": ["http://127.0.0.1:3000/*", "http://127.0.0.1:3001/*"]
+  },
+  "background": {
+    "service_worker": "src/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://open.spotify.com/*"],
+      "js": ["src/main-observer.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://open.spotify.com/*"],
+      "js": [
+        "src/content-bridge.js",
+        "src/analyzer/targetResolver.js",
+        "src/analyzer/bridge.js",
+        "src/analyzer/chart.js",
+        "src/analyzer/modal.js",
+        "src/analyzer/contextMenu.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": ["http://127.0.0.1:3000/*", "http://127.0.0.1:3001/*"],
+      "js": ["src/panel-bridge.js"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/analyzer/modal.css"],
+      "matches": ["https://open.spotify.com/*"]
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_title": "Ocean Analyzer",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "options_page": "src/options.html",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'none'"
+  }
+}
