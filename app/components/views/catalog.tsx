@@ -1,14 +1,20 @@
 "use client";
 
 /**
- * Catalog views (Distributors / Artists / Albums / Tracks), built ONLY from
- * real local data: the canonical UUID mapping and the lookup history. Nothing
- * here is fabricated — these views grow as tracks are analyzed.
+ * Catalog views (Artists / Albums / Tracks), built ONLY from real local data:
+ * the lookup history. Nothing here is fabricated — these views grow as
+ * tracks are analyzed. (Distributors moved to distributor/DistributorDatabasePage.)
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { PageHead, EmptyState, ArtworkThumb, StatCard, CopyButton } from "../ui";
-import { HistoryItem, jget } from "../../lib/types";
+import { Disc3, Music2, Search, Users } from "lucide-react";
+import { PageHead } from "../shared/PageHead";
+import { EmptyState } from "../shared/EmptyState";
+import { ArtworkThumb } from "../shared/ArtworkThumb";
+import { Skeleton } from "../shared/Skeleton";
+import { Button } from "../shared/Button";
+import type { HistoryItem } from "../../lib/types";
+import { jget, fmtDate } from "../../lib/types";
 
 function useHistory(): HistoryItem[] | null {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
@@ -16,66 +22,12 @@ function useHistory(): HistoryItem[] | null {
   return items;
 }
 
-// ---------------- Distributors ----------------
-type MappingStatus = { validMappings: number; totalRecords: number; duplicateRecords: number; conflicts: number; lastLoadedAt: string | null };
-
-export function DistributorsView({ flash }: { flash: (m: string) => void }) {
-  const items = useHistory();
-  const [status, setStatus] = useState<MappingStatus | null>(null);
-  const [q, setQ] = useState("");
-  const [res, setRes] = useState<{ results: { uuid: string; distributor: string }[]; truncated: boolean } | null>(null);
-  useEffect(() => { jget<MappingStatus>("/api/uuid-mapping/status").then(setStatus).catch(() => {}); }, []);
-  const search = () => { if (q.trim()) fetch(`/api/uuid-mapping/search?q=${encodeURIComponent(q)}`).then((r) => r.json()).then(setRes); };
-
-  const observed = useMemo(() => {
-    const map = new Map<string, { name: string; analyses: number; tracks: Set<string>; artists: Set<string>; lastSeen: string }>();
-    for (const h of items ?? []) {
-      if (!h.distributor) continue;
-      const e = map.get(h.distributor) ?? { name: h.distributor, analyses: 0, tracks: new Set<string>(), artists: new Set<string>(), lastSeen: h.at };
-      e.analyses++;
-      if (h.spotifyTrackId ?? h.isrc ?? h.trackTitle) e.tracks.add(h.spotifyTrackId ?? h.isrc ?? h.trackTitle ?? "");
-      for (const a of h.artists ?? []) e.artists.add(a);
-      if (h.at > e.lastSeen) e.lastSeen = h.at;
-      map.set(h.distributor, e);
-    }
-    return [...map.values()].sort((a, b) => b.analyses - a.analyses);
-  }, [items]);
-
+function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
-    <>
-      <PageHead title="Distributors" desc="The canonical licensor-UUID mapping plus every distributor observed in your analyses." />
-      <div className="cards" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
-        <StatCard label="Mapped distributors" value={status?.validMappings ?? "—"} sub="canonical UUID records" />
-        <StatCard label="Observed in analyses" value={items ? observed.length : "—"} sub="from lookup history" />
-        <StatCard label="Duplicates" value={status?.duplicateRecords ?? "—"} />
-        <StatCard label="Conflicts" value={status?.conflicts ?? "—"} tone={(status?.conflicts ?? 0) > 0 ? "err" : undefined} />
-      </div>
-
-      <section className="panel anim-in">
-        <h3 className="panel-title">Search the canonical mapping</h3>
-        <div className="row"><input type="text" value={q} placeholder="Search UUID or distributor name" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") search(); }} style={{ flex: 1, maxWidth: 420 }} aria-label="Search mapping" /><button className="btn" onClick={search}>Search</button></div>
-        <p className="hint" style={{ marginTop: 8 }}>The full mapping is never loaded into the browser — search returns at most 50 rows.</p>
-        {res && (res.results.length === 0 ? <EmptyState title="No matches" /> :
-          <div className="table-scroll" style={{ marginTop: 10 }}><table><thead><tr><th>Distributor</th><th>Licensor UUID</th><th></th></tr></thead>
-            <tbody>{res.results.map((r) => <tr key={r.uuid}><td className="distributor-value" style={{ fontWeight: 600 }}>{r.distributor}</td><td className="mono" style={{ overflowWrap: "anywhere" }}>{r.uuid}</td><td><CopyButton value={r.uuid} label="UUID" flash={flash} /> <CopyButton value={r.distributor} label="name" flash={flash} /></td></tr>)}</tbody></table></div>)}
-      </section>
-
-      <section className="panel anim-in">
-        <h3 className="panel-title">Observed in your analyses</h3>
-        {!items ? <div className="skeleton" style={{ height: 120 }} /> :
-          observed.length === 0 ? <EmptyState title="No distributors observed yet" body="Distributors appear here once analyses resolve them." /> :
-          <div className="table-scroll"><table>
-            <thead><tr><th>Distributor</th><th>Analyses</th><th>Tracks</th><th>Artists</th><th>Last seen</th></tr></thead>
-            <tbody>{observed.map((d) => (
-              <tr key={d.name}>
-                <td className="distributor-value" style={{ fontWeight: 600 }}>{d.name}</td>
-                <td>{d.analyses}</td><td>{d.tracks.size}</td><td>{d.artists.size}</td>
-                <td className="hint">{new Date(d.lastSeen).toLocaleDateString()}</td>
-              </tr>
-            ))}</tbody>
-          </table></div>}
-      </section>
-    </>
+    <div className="flex h-9 max-w-sm items-center gap-2 rounded-sm border border-border-strong bg-input px-2.5">
+      <Search className="size-3.5 shrink-0 text-foreground-muted" aria-hidden />
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-foreground-muted" />
+    </div>
   );
 }
 
@@ -102,28 +54,42 @@ export function ArtistsView() {
   const filtered = q.trim() ? artists.filter((a) => a.name.toLowerCase().includes(q.trim().toLowerCase())) : artists;
 
   return (
-    <>
-      <PageHead title="Artists" desc="Every artist observed in your analyses, with their tracks and resolved distributors." />
-      <section className="panel anim-in">
-        <div className="row" style={{ marginBottom: 10 }}>
-          <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search artists…" aria-label="Search artists" style={{ maxWidth: 300 }} />
-        </div>
-        {!items ? <div className="skeleton" style={{ height: 160 }} /> :
-          filtered.length === 0 ? <EmptyState title={q ? "No matches" : "No artists yet"} body={q ? undefined : "Artists appear here as you analyze tracks."} /> :
-          <div className="table-scroll"><table>
-            <thead><tr><th></th><th>Artist</th><th>Analyzed tracks</th><th>Analyses</th><th>Distributors</th><th>Last analyzed</th></tr></thead>
-            <tbody>{filtered.map((a) => (
-              <tr key={a.name}>
-                <td style={{ width: 42 }}><ArtworkThumb url={a.artwork} alt={a.name} /></td>
-                <td style={{ fontWeight: 600 }}>{a.name}</td>
-                <td>{a.tracks.size}</td><td>{a.analyses}</td>
-                <td className="distributor-value">{[...a.distributors].join(", ") || "—"}</td>
-                <td className="hint">{new Date(a.lastSeen).toLocaleDateString()}</td>
+    <div>
+      <PageHead title="Artists" description="Every artist observed in your analyses, with their tracks and resolved distributors." />
+      <div className="mb-4"><SearchInput value={q} onChange={setQ} placeholder="Search artists…" /></div>
+      {!items ? (
+        <Skeleton className="h-40 w-full" />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={<Users className="size-5" aria-hidden />} title={q ? "No matches" : "No artists yet"} description={q ? undefined : "Artists appear here as you analyze tracks."} />
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-border-strong">
+          <table className="w-full text-[13px]">
+            <thead className="bg-card-elevated">
+              <tr className="border-b border-border-subtle text-left text-[10.5px] font-semibold uppercase tracking-wide text-foreground-muted">
+                <th className="w-12 px-3 py-2.5" />
+                <th className="px-3 py-2.5">Artist</th>
+                <th className="px-3 py-2.5">Analyzed tracks</th>
+                <th className="px-3 py-2.5">Analyses</th>
+                <th className="px-3 py-2.5">Distributors</th>
+                <th className="px-3 py-2.5">Last analyzed</th>
               </tr>
-            ))}</tbody>
-          </table></div>}
-      </section>
-    </>
+            </thead>
+            <tbody>
+              {filtered.map((a) => (
+                <tr key={a.name} className="border-b border-border-subtle last:border-0 hover:bg-card-hover">
+                  <td className="px-3 py-2"><ArtworkThumb src={a.artwork} alt={a.name} size={32} rounded="full" /></td>
+                  <td className="px-3 py-2 font-medium text-foreground">{a.name}</td>
+                  <td className="px-3 py-2 tabular-nums text-foreground-secondary">{a.tracks.size}</td>
+                  <td className="px-3 py-2 tabular-nums text-foreground-secondary">{a.analyses}</td>
+                  <td className="px-3 py-2 text-foreground-secondary">{[...a.distributors].join(", ") || "—"}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-foreground-muted">{fmtDate(a.lastSeen)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -146,27 +112,34 @@ export function AlbumsView({ onAnalyze }: { onAnalyze: (input: string) => void }
   }, [items]);
 
   return (
-    <>
-      <PageHead title="Albums" desc="Releases observed in your analyses. Open one to load its full tracklist." />
-      {!items ? <div className="skeleton" style={{ height: 200 }} /> :
-        albums.length === 0 ? <EmptyState title="No albums yet" body="Albums appear here as you analyze tracks. Older history entries (before the catalog upgrade) don't carry album data." /> :
-        <div className="album-grid">
+    <div>
+      <PageHead title="Releases" description="Releases observed in your analyses. Open one to load its full tracklist." />
+      {!items ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="aspect-square w-full" />)}</div>
+      ) : albums.length === 0 ? (
+        <EmptyState icon={<Disc3 className="size-5" aria-hidden />} title="No releases yet" description="Releases appear here as you analyze tracks. Older history entries (before the catalog upgrade) don't carry album data." />
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
           {albums.map((a) => (
-            <div key={a.key} className="album-card anim-in" role={a.albumId ? "button" : undefined} tabIndex={a.albumId ? 0 : undefined}
+            <button
+              key={a.key}
+              disabled={!a.albumId}
               onClick={() => a.albumId && onAnalyze(`https://open.spotify.com/album/${a.albumId}`)}
-              onKeyDown={(e) => { if (a.albumId && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onAnalyze(`https://open.spotify.com/album/${a.albumId}`); } }}
-              title={a.albumId ? "Open release workspace" : undefined}>
-              <ArtworkThumb url={a.artwork} alt={a.title} size={148} radius={10} />
-              <div style={{ marginTop: 8, fontWeight: 600, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.title}</div>
-              <div className="hint" style={{ fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.artist}</div>
-              <div className="hint" style={{ fontSize: 10.5, marginTop: 4 }}>
+              title={a.albumId ? "Open release workspace" : undefined}
+              className="group rounded-md border border-border-strong bg-card p-2.5 text-left transition-[transform,border-color] duration-base hover:-translate-y-0.5 hover:border-accent/30 disabled:cursor-default disabled:hover:translate-y-0"
+            >
+              <ArtworkThumb src={a.artwork} alt={a.title} size={148} rounded="md" className="w-full" />
+              <div className="mt-2 truncate text-[12.5px] font-medium text-foreground">{a.title}</div>
+              <div className="truncate text-[11.5px] text-foreground-muted">{a.artist}</div>
+              <div className="mt-1 text-[10.5px] text-foreground-muted">
                 {a.releaseDate ? new Date(a.releaseDate).getFullYear() : ""}{a.tracks.size ? ` · ${a.tracks.size} analyzed` : ""}
               </div>
-              {a.distributors.size > 0 && <div className="distributor-value hint" style={{ fontSize: 10.5, color: "var(--accent)" }}>{[...a.distributors].join(", ")}</div>}
-            </div>
+              {a.distributors.size > 0 && <div className="mt-0.5 truncate text-[10.5px] text-accent">{[...a.distributors].join(", ")}</div>}
+            </button>
           ))}
-        </div>}
-    </>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -179,7 +152,7 @@ export function TracksView({ onAnalyze }: { onAnalyze: (input: string) => void }
     for (const h of items ?? []) {
       const key = h.spotifyTrackId ?? h.isrc ?? `${h.trackTitle}::${(h.artists ?? []).join(",")}`;
       if (!key || key.startsWith("null")) continue;
-      if (!map.has(key)) map.set(key, h); // history is newest-first — keep the latest
+      if (!map.has(key)) map.set(key, h);
     }
     return [...map.values()];
   }, [items]);
@@ -189,30 +162,45 @@ export function TracksView({ onAnalyze }: { onAnalyze: (input: string) => void }
     : tracks;
 
   return (
-    <>
-      <PageHead title="Tracks" desc="Every distinct track you've analyzed — latest result per track." />
-      <section className="panel anim-in">
-        <div className="row" style={{ marginBottom: 10 }}>
-          <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search title, artist, ISRC…" aria-label="Search tracks" style={{ maxWidth: 320 }} />
-        </div>
-        {!items ? <div className="skeleton" style={{ height: 160 }} /> :
-          filtered.length === 0 ? <EmptyState title={q ? "No matches" : "No tracks yet"} body={q ? undefined : "Analyzed tracks appear here."} /> :
-          <div className="table-scroll"><table>
-            <thead><tr><th></th><th>Track</th><th>Artist</th><th>ISRC</th><th>Distributor</th><th>Released</th><th>Analyzed</th><th></th></tr></thead>
-            <tbody>{filtered.map((t, i) => (
-              <tr key={t.id ?? i}>
-                <td style={{ width: 42 }}><ArtworkThumb url={t.artworkUrl} alt={t.trackTitle ?? "artwork"} /></td>
-                <td style={{ fontWeight: 550 }}>{t.trackTitle ?? t.input.slice(0, 24)}</td>
-                <td>{(t.artists ?? []).join(", ") || "—"}</td>
-                <td className="mono">{t.isrc ?? "—"}</td>
-                <td className="distributor-value">{t.distributor ?? "—"}</td>
-                <td className="hint">{t.releaseDate ?? "—"}</td>
-                <td className="hint">{new Date(t.at).toLocaleDateString()}</td>
-                <td><button className="btn btn-sm" onClick={() => onAnalyze(t.spotifyTrackId ?? t.input)}>Open</button></td>
+    <div>
+      <PageHead title="Tracks" description="Every distinct track you've analyzed — latest result per track." />
+      <div className="mb-4"><SearchInput value={q} onChange={setQ} placeholder="Search title, artist, ISRC…" /></div>
+      {!items ? (
+        <Skeleton className="h-40 w-full" />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={<Music2 className="size-5" aria-hidden />} title={q ? "No matches" : "No tracks yet"} description={q ? undefined : "Analyzed tracks appear here."} />
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-border-strong">
+          <table className="w-full text-[13px]">
+            <thead className="bg-card-elevated">
+              <tr className="border-b border-border-subtle text-left text-[10.5px] font-semibold uppercase tracking-wide text-foreground-muted">
+                <th className="w-12 px-3 py-2.5" />
+                <th className="px-3 py-2.5">Track</th>
+                <th className="px-3 py-2.5">Artist</th>
+                <th className="px-3 py-2.5">ISRC</th>
+                <th className="px-3 py-2.5">Distributor</th>
+                <th className="px-3 py-2.5">Released</th>
+                <th className="px-3 py-2.5">Analyzed</th>
+                <th className="px-3 py-2.5" />
               </tr>
-            ))}</tbody>
-          </table></div>}
-      </section>
-    </>
+            </thead>
+            <tbody>
+              {filtered.map((t, i) => (
+                <tr key={t.id ?? i} className="border-b border-border-subtle last:border-0 hover:bg-card-hover">
+                  <td className="px-3 py-2"><ArtworkThumb src={t.artworkUrl} alt={t.trackTitle ?? "artwork"} size={32} /></td>
+                  <td className="px-3 py-2 font-medium text-foreground">{t.trackTitle ?? t.input.slice(0, 24)}</td>
+                  <td className="px-3 py-2 text-foreground-secondary">{(t.artists ?? []).join(", ") || "—"}</td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-foreground-muted">{t.isrc ?? "—"}</td>
+                  <td className="px-3 py-2 text-foreground-secondary">{t.distributor ?? "—"}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-foreground-muted">{t.releaseDate ?? "—"}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-foreground-muted">{fmtDate(t.at)}</td>
+                  <td className="px-3 py-2"><Button variant="secondary" size="sm" onClick={() => onAnalyze(t.spotifyTrackId ?? t.input)}>Open</Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

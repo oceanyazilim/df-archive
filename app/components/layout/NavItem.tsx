@@ -21,7 +21,7 @@ export function NavItem({ item, active, collapsed, onClick }: NavItemProps) {
       aria-current={active || undefined}
       aria-label={item.label}
       className={cn(
-        "group relative flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-[13px] font-medium transition-colors duration-fast ease-out",
+        "group relative flex min-h-11 w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-[13px] font-medium transition-colors duration-fast ease-out",
         collapsed && "justify-center px-0",
         active ? "text-foreground bg-gradient-to-r from-accent-dim to-transparent" : "text-foreground-secondary hover:bg-card-hover hover:text-foreground"
       )}

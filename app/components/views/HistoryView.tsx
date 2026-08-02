@@ -1,48 +1,121 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PageHead, EmptyState, ArtworkThumb } from "../ui";
-import { HistoryItem, jget } from "../../lib/types";
+import { History, Search, Trash2 } from "lucide-react";
+import { PageHead } from "../shared/PageHead";
+import { EmptyState } from "../shared/EmptyState";
+import { ArtworkThumb } from "../shared/ArtworkThumb";
+import { Skeleton } from "../shared/Skeleton";
+import { Button } from "../shared/Button";
+import { StatusBadge, metadataStatusTone } from "../shared/StatusBadge";
+import { ConfirmDialog } from "../shared/ConfirmDialog";
+import { HistoryItem, jget, fmtDate } from "../../lib/types";
 
-/** Lookup history — real analyses only. Artwork appears for entries analyzed after the catalog upgrade. */
+const STATUS_OPTIONS = ["all", "verified", "unresolved", "conflict"];
+
+/** Recent Analyses — real lookup history only. Reopens cached results without re-running the analysis. */
 export function HistoryView({ onAnalyze }: { onAnalyze: (input: string) => void }) {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [q, setQ] = useState("");
+  const [status, setStatus] = useState("all");
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
   const load = useCallback(() => jget<{ items: HistoryItem[] }>("/api/history").then((d) => setItems(d.items)).catch(() => setItems([])), []);
   useEffect(() => { load(); }, [load]);
 
   const filtered = (items ?? []).filter((h) => {
+    if (status !== "all" && h.resolutionStatus !== status) return false;
     if (!q.trim()) return true;
     const s = q.trim().toLowerCase();
     return (h.trackTitle ?? "").toLowerCase().includes(s) || (h.artists ?? []).join(" ").toLowerCase().includes(s) || (h.distributor ?? "").toLowerCase().includes(s) || (h.isrc ?? "").toLowerCase().includes(s);
   });
 
+  async function clearHistory() {
+    setClearing(true);
+    await fetch("/api/history", { method: "DELETE" });
+    setClearing(false);
+    setConfirmClear(false);
+    load();
+  }
+
   return (
-    <>
-      <PageHead title="Lookup History" desc="Previously analyzed tracks. No credentials or private responses are stored."
-        actions={<button className="btn btn-sm danger" onClick={() => fetch("/api/history", { method: "DELETE" }).then(load)}>Clear history</button>} />
-      <section className="panel anim-in">
-        <div className="row" style={{ marginBottom: 10 }}>
-          <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search track, artist, distributor, ISRC…" aria-label="Search history" style={{ maxWidth: 340 }} />
+    <div>
+      <PageHead
+        title="Recent Analyses"
+        description="Previously analyzed tracks. No credentials or private responses are stored."
+        actions={
+          <Button variant="danger" size="sm" icon={<Trash2 className="size-3.5" aria-hidden />} onClick={() => setConfirmClear(true)} disabled={!items?.length}>
+            Clear history
+          </Button>
+        }
+      />
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex h-9 max-w-sm flex-1 items-center gap-2 rounded-sm border border-border-strong bg-input px-2.5">
+          <Search className="size-3.5 shrink-0 text-foreground-muted" aria-hidden />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search track, artist, distributor, ISRC…" className="w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-foreground-muted" />
         </div>
-        {!items ? <div className="skeleton" style={{ height: 200 }} /> :
-          filtered.length === 0 ? <EmptyState title={q ? "No matches" : "No lookups yet"} body={q ? "Try a different search." : "Analyze a track from the search bar above — every analysis lands here."} /> :
-          <div className="table-scroll"><table>
-            <thead><tr><th></th><th>Track</th><th>Artist</th><th>ISRC</th><th>Distributor</th><th>Status</th><th>Analyzed</th><th></th></tr></thead>
-            <tbody>{filtered.map((h, i) => (
-              <tr key={h.id ?? i}>
-                <td style={{ width: 42 }}><ArtworkThumb url={h.artworkUrl} alt={h.trackTitle ?? "artwork"} /></td>
-                <td style={{ fontWeight: 550 }}>{h.trackTitle ?? h.input.slice(0, 24)}</td>
-                <td>{(h.artists ?? []).join(", ") || "—"}</td>
-                <td className="mono">{h.isrc ?? "—"}</td>
-                <td className="distributor-value">{h.distributor ?? "—"}</td>
-                <td><span className={`badge ${h.resolutionStatus === "verified" ? "ok" : "muted"}`} style={{ fontSize: 10 }}><span className="dot" />{h.resolutionStatus}</span></td>
-                <td className="hint">{new Date(h.at).toLocaleString()}</td>
-                <td><button className="btn btn-sm" onClick={() => onAnalyze(h.spotifyTrackId ?? h.input)}>Re-analyze</button></td>
+        <div className="flex gap-0.5 rounded-md border border-border-strong bg-card-elevated p-0.5">
+          {STATUS_OPTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatus(s)}
+              className={`rounded px-2.5 py-1 text-[11.5px] font-medium capitalize transition-colors ${status === s ? "bg-card-hover text-foreground" : "text-foreground-muted hover:text-foreground-secondary"}`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!items ? (
+        <Skeleton className="h-64 w-full" />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={<History className="size-5" aria-hidden />} title={q || status !== "all" ? "No matches" : "No lookups yet"} description={q || status !== "all" ? "Try a different search or filter." : "Analyze a track from the search bar above — every analysis lands here."} />
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-border-strong">
+          <table className="w-full text-[13px]">
+            <thead className="bg-card-elevated">
+              <tr className="border-b border-border-subtle text-left text-[10.5px] font-semibold uppercase tracking-wide text-foreground-muted">
+                <th className="w-12 px-3 py-2.5" />
+                <th className="px-3 py-2.5">Track</th>
+                <th className="px-3 py-2.5">Artist</th>
+                <th className="px-3 py-2.5">ISRC</th>
+                <th className="px-3 py-2.5">Distributor</th>
+                <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Analyzed</th>
+                <th className="px-3 py-2.5" />
               </tr>
-            ))}</tbody>
-          </table></div>}
-      </section>
-    </>
+            </thead>
+            <tbody>
+              {filtered.map((h, i) => (
+                <tr key={h.id ?? i} className="border-b border-border-subtle last:border-0 hover:bg-card-hover">
+                  <td className="px-3 py-2"><ArtworkThumb src={h.artworkUrl} alt={h.trackTitle ?? "artwork"} size={32} /></td>
+                  <td className="px-3 py-2 font-medium text-foreground">{h.trackTitle ?? h.input.slice(0, 24)}</td>
+                  <td className="px-3 py-2 text-foreground-secondary">{(h.artists ?? []).join(", ") || "—"}</td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-foreground-muted">{h.isrc ?? "—"}</td>
+                  <td className="px-3 py-2 text-foreground-secondary">{h.distributor ?? "—"}</td>
+                  <td className="px-3 py-2"><StatusBadge tone={metadataStatusTone(h.resolutionStatus)}>{h.resolutionStatus}</StatusBadge></td>
+                  <td className="px-3 py-2 whitespace-nowrap text-foreground-muted">{fmtDate(h.at)}</td>
+                  <td className="px-3 py-2"><Button variant="secondary" size="sm" onClick={() => onAnalyze(h.spotifyTrackId ?? h.input)}>Re-analyze</Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmClear}
+        onOpenChange={setConfirmClear}
+        title="Clear all history?"
+        description="This permanently removes every recorded analysis from this workspace. It can't be undone."
+        confirmLabel="Clear history"
+        destructive
+        loading={clearing}
+        onConfirm={clearHistory}
+      />
+    </div>
   );
 }

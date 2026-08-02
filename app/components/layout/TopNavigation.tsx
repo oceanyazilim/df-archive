@@ -39,7 +39,7 @@ export function TopNavigation({ view, onToggleSidebar, onAnalyze, running, healt
 
   return (
     <header className="sticky top-0 z-topbar flex h-header shrink-0 items-center gap-3 border-b border-border-subtle bg-header px-4 backdrop-blur-md sm:px-6">
-      <IconButton label="Toggle sidebar" icon={<Menu className="size-4" aria-hidden />} variant="ghost" onClick={onToggleSidebar} />
+      <IconButton label="Toggle sidebar" icon={<Menu className="size-4" aria-hidden />} variant="ghost" size="lg" onClick={onToggleSidebar} className="lg:size-8" />
 
       <div className="min-w-0 shrink-0">
         <nav aria-label="Breadcrumb" className="text-[10.5px] text-foreground-muted">{VIEW_SECTION[view]}</nav>

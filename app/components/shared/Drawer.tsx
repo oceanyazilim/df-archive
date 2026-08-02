@@ -46,7 +46,7 @@ export function Drawer({ open, onOpenChange, title, subtitle, actions, children,
             <div className="flex shrink-0 items-center gap-1.5">
               {actions}
               <DialogPrimitive.Close asChild>
-                <IconButton label="Close" icon={<X className="size-4" aria-hidden />} variant="ghost" size="sm" />
+                <IconButton label="Close" icon={<X className="size-4" aria-hidden />} variant="ghost" size="lg" className="lg:size-8" />
               </DialogPrimitive.Close>
             </div>
           </header>

@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHead, StatCard } from "../ui";
+import { Download } from "lucide-react";
+import { PageHead } from "../shared/PageHead";
+import { StatCard } from "../shared/StatCard";
+import { Panel } from "../shared/Card";
+import { Button } from "../shared/Button";
 import { HistoryItem, jget } from "../../lib/types";
 
 /**
- * Reports & export center — honest, data-backed exports only:
- * lookup history, distributor summary, and mapping statistics.
+ * Export Center — honest, data-backed exports only: lookup history,
+ * distributor summary, and mapping statistics.
  */
 export function ReportsView() {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
@@ -44,44 +48,40 @@ export function ReportsView() {
       .map(([name, e]) => [name, e.analyses, e.tracks.size, e.artists.size].map(esc).join(","));
     dl(`distributor-summary-${new Date().toISOString().slice(0, 10)}.csv`, "distributor,analyses,tracks,artists\n" + rows.join("\n"), "text/csv");
   };
+  const mappingJson = () => jget<Record<string, unknown>>("/api/uuid-mapping/status").then((s) => dl(`uuid-mapping-status-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(s, null, 2), "application/json")).catch(() => {});
 
   return (
-    <>
-      <PageHead title="Reports" desc="Export your real analysis data — nothing estimated, nothing fabricated." />
-      <div className="cards" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+    <div>
+      <PageHead title="Export Center" description="Export your real analysis data — nothing estimated, nothing fabricated." />
+      <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total analyses" value={stats?.total ?? "—"} />
         <StatCard label="Analyses today" value={stats?.searchesToday ?? "—"} />
         <StatCard label="Distributor matches" value={stats?.distributorMatches ?? "—"} />
       </div>
-      <div className="info-3">
-        <section className="panel anim-in">
-          <h3 className="panel-title">Lookup History</h3>
-          <p className="hint">Every analysis with track, artist, ISRC, distributor and status.</p>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn btn-sm" onClick={historyCsv} disabled={!items?.length}>Download CSV</button>
-            <button className="btn btn-sm" onClick={historyJson} disabled={!items?.length}>Download JSON</button>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Panel title="Lookup History" description="Every analysis with track, artist, ISRC, distributor and status.">
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" icon={<Download className="size-3.5" aria-hidden />} onClick={historyCsv} disabled={!items?.length}>CSV</Button>
+            <Button variant="secondary" size="sm" icon={<Download className="size-3.5" aria-hidden />} onClick={historyJson} disabled={!items?.length}>JSON</Button>
           </div>
-        </section>
-        <section className="panel anim-in">
-          <h3 className="panel-title">Distributor Summary</h3>
-          <p className="hint">Distributors observed in your analyses, with track and artist counts.</p>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn btn-sm" onClick={distributorCsv} disabled={!items?.length}>Download CSV</button>
-          </div>
-          {stats?.topDistributors?.length ? (
-            <div style={{ marginTop: 10 }}>
-              {stats.topDistributors.map((d) => <div key={d.name} className="kv"><span className="k distributor-value">{d.name}</span><span className="v">{d.count}</span></div>)}
+        </Panel>
+        <Panel title="Distributor Summary" description="Distributors observed in your analyses, with track and artist counts.">
+          <Button variant="secondary" size="sm" icon={<Download className="size-3.5" aria-hidden />} onClick={distributorCsv} disabled={!items?.length}>CSV</Button>
+          {stats?.topDistributors && stats.topDistributors.length > 0 && (
+            <div className="mt-3 divide-y divide-border-subtle">
+              {stats.topDistributors.map((d) => (
+                <div key={d.name} className="flex items-center justify-between py-1.5 text-[12.5px]">
+                  <span className="text-foreground-secondary">{d.name}</span>
+                  <span className="tabular-nums text-foreground">{d.count}</span>
+                </div>
+              ))}
             </div>
-          ) : null}
-        </section>
-        <section className="panel anim-in">
-          <h3 className="panel-title">Mapping Statistics</h3>
-          <p className="hint">Current state of the canonical distributor UUID mapping.</p>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn btn-sm" onClick={() => jget<Record<string, unknown>>("/api/uuid-mapping/status").then((s) => dl(`uuid-mapping-status-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(s, null, 2), "application/json")).catch(() => {})}>Download JSON</button>
-          </div>
-        </section>
+          )}
+        </Panel>
+        <Panel title="Mapping Statistics" description="Current state of the canonical distributor UUID mapping.">
+          <Button variant="secondary" size="sm" icon={<Download className="size-3.5" aria-hidden />} onClick={mappingJson}>JSON</Button>
+        </Panel>
       </div>
-    </>
+    </div>
   );
 }

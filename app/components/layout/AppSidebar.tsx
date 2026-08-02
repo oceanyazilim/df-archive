@@ -49,7 +49,7 @@ export function AppSidebar({ view, onNavigate, collapsed, onToggleCollapsed, dra
         onClick={onToggleCollapsed}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         className={cn(
-          "mx-3 mb-2 flex items-center gap-2 rounded-sm px-2.5 py-1.5 text-[11.5px] font-medium text-foreground-muted transition-colors hover:bg-card-hover hover:text-foreground-secondary",
+          "mx-3 mb-2 flex min-h-11 items-center gap-2 rounded-sm px-2.5 py-1.5 text-[11.5px] font-medium text-foreground-muted transition-colors hover:bg-card-hover hover:text-foreground-secondary",
           collapsed && "mx-auto justify-center px-1.5"
         )}
       >

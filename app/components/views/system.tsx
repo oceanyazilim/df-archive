@@ -3,17 +3,19 @@
 /** System views: UUID Directory, System Status, Settings (theme, background, connector). */
 
 import { useCallback, useEffect, useState } from "react";
-import { Search } from "lucide-react";
-import { PageHead, EmptyState } from "../ui";
+import { RefreshCw, Search, Wifi } from "lucide-react";
 import { PageHead as NewPageHead } from "../shared/PageHead";
 import { StatCard } from "../shared/StatCard";
 import { EmptyState as NewEmptyState } from "../shared/EmptyState";
-import { StatusBadge } from "../shared/StatusBadge";
+import { StatusBadge, type StatusBadgeProps } from "../shared/StatusBadge";
 import { CopyButton } from "../shared/CopyButton";
 import { Panel } from "../shared/Card";
+import { Button } from "../shared/Button";
 import { GradientCustomizer } from "../GradientCustomizer";
 import { queryConnectorState, startPairing, requestBridgeReconnect, queryBridgeCommandResult, ConnectorState } from "../../lib/connector";
 import { Health, jget } from "../../lib/types";
+
+type Tone = NonNullable<StatusBadgeProps["tone"]>;
 
 // ---------------- UUID Database ----------------
 export function UuidDirectoryView() {
@@ -67,40 +69,69 @@ export function UuidDirectoryView() {
   );
 }
 
-// ---------------- System Status ----------------
+// ---------------- API Status ----------------
 const COMP_LABEL: Record<string, string> = { operational: "Operational", degraded: "Degraded", not_configured: "Not configured", plan_restricted: "Unavailable", optional: "Operational", failed: "Failed" };
-const COMP_CLS: Record<string, string> = { operational: "ok", degraded: "warn", not_configured: "muted", plan_restricted: "warn", optional: "ok", failed: "err" };
+const COMP_TONE: Record<string, Tone> = { operational: "success", degraded: "warning", not_configured: "neutral", plan_restricted: "warning", optional: "success", failed: "danger" };
 const SAFE_COMPONENTS: [string, string][] = [
   ["Application Backend", "applicationBackend"], ["Track Metadata", "spotifyApi"], ["Streaming Analytics", "soundchartsCustomerApi"],
   ["UUID Resolver", "distributorResolver"], ["Local Data", "uuidMapping"], ["Cache", "cache"], ["Lookup History", "lookupHistory"],
 ];
 export function SystemStatusView({ health }: { health: Health | null }) {
   return (
-    <>
-      <PageHead title="System Status" desc="Generic component availability. No provider names, endpoints, or credentials are shown." />
-      <section className="panel anim-in">
-        {!health ? <div className="empty">Loading…</div> : <div>{SAFE_COMPONENTS.map(([label, key]) => { const v = health.components[key] ?? "operational"; return <div key={key} className="kv"><span className="k">{label}</span><span className={`badge ${COMP_CLS[v] ?? "muted"}`}><span className="dot" />{COMP_LABEL[v] ?? "Operational"}</span></div>; })}</div>}
-      </section>
-    </>
+    <div>
+      <NewPageHead title="API Status" description="Generic component availability. No provider names, endpoints, or credentials are shown." />
+      <Panel>
+        {!health ? (
+          <p className="text-sm text-foreground-muted">Loading…</p>
+        ) : (
+          <div className="divide-y divide-border-subtle">
+            {SAFE_COMPONENTS.map(([label, key]) => {
+              const v = health.components[key] ?? "operational";
+              return (
+                <div key={key} className="flex items-center justify-between py-2.5 text-[13px]">
+                  <span className="text-foreground-secondary">{label}</span>
+                  <StatusBadge tone={COMP_TONE[v] ?? "neutral"}>{COMP_LABEL[v] ?? "Operational"}</StatusBadge>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
+    </div>
   );
 }
 
 // ---------------- Settings ----------------
 export function SettingsView({ health }: { health: Health | null }) {
   return (
-    <>
-      <PageHead title="Settings" desc="Dashboard background, the Spotify connector, and application information." />
-      <GradientCustomizer />
+    <div className="space-y-5">
+      <NewPageHead title="Settings" description="Appearance, the Spotify connector, and application information." />
+      <Panel title="Appearance" description="Off by default — a subtle animated backdrop, always low-opacity and never affecting readability.">
+        <GradientCustomizer />
+      </Panel>
       <ConnectorSettings />
       <CredentialPools health={health} />
-      <section className="panel anim-in">
-        <h3 className="panel-title">Application</h3>
-        <div className="kv"><span className="k">Name</span><span className="v">Ocean Distro Finder</span></div>
-        <div className="kv"><span className="k">Version</span><span className="v">1.0.0</span></div>
-        <div className="kv"><span className="k">Lookup service</span><span className={`badge ${health?.primaryLookupReady ? "ok" : "muted"}`}><span className="dot" />{health?.primaryLookupReady ? "Operational" : "Not configured"}</span></div>
-        <div className="kv"><span className="k">Distributor records</span><span className="v">{health?.uuidMappingCount ?? "—"}</span></div>
-      </section>
-    </>
+      <Panel title="Application">
+        <div className="divide-y divide-border-subtle">
+          <Row k="Name" v="Ocean Distro Finder" />
+          <Row k="Version" v="1.0.0" />
+          <div className="flex items-center justify-between py-2.5 text-[13px]">
+            <span className="text-foreground-secondary">Lookup service</span>
+            <StatusBadge tone={health?.primaryLookupReady ? "success" : "neutral"}>{health?.primaryLookupReady ? "Operational" : "Not configured"}</StatusBadge>
+          </div>
+          <Row k="Distributor records" v={`${health?.uuidMappingCount ?? "—"}`} />
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex items-center justify-between py-2.5 text-[13px]">
+      <span className="text-foreground-secondary">{k}</span>
+      <span className="font-medium text-foreground">{v}</span>
+    </div>
   );
 }
 
@@ -132,81 +163,78 @@ function CredentialPools({ health }: { health: Health | null }) {
     if (s <= 0) return "expired";
     return s < 3600 ? `${Math.ceil(s / 60)}m` : `${Math.floor(s / 3600)}h ${Math.ceil((s % 3600) / 60)}m`;
   };
-  const stateCls: Record<string, string> = { available: "ok", active: "ok", cooling: "warn", disabled: "err", invalid: "err" };
+  const stateTone: Record<string, Tone> = { available: "success", active: "success", cooling: "warning", disabled: "danger", invalid: "danger" };
 
   return (
-    <section className="panel anim-in">
-      <h3 className="panel-title">API Credentials</h3>
-      {!pools ? <div className="hint">Loading…</div> : Object.values(pools).map((pool) => (
-        <div key={pool.provider} style={{ marginBottom: 16 }}>
-          <div className="kv">
-            <span className="k" style={{ textTransform: "capitalize" }}>{pool.provider}</span>
-            <span className={`badge ${pool.available > 0 ? "ok" : pool.total === 0 ? "muted" : "warn"}`}>
-              <span className="dot" />
-              {pool.total === 0 ? "Not configured" : `${pool.available} of ${pool.total} available`}
-              {pool.legacyAvailable > 0 ? ` · ${pool.legacyAvailable} legacy` : ""}
-            </span>
-          </div>
+    <Panel title="API Credentials">
+      {!pools ? (
+        <p className="text-sm text-foreground-muted">Loading…</p>
+      ) : (
+        Object.values(pools).map((pool) => (
+          <div key={pool.provider} className="mb-5 last:mb-0">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[13px] font-medium capitalize text-foreground">{pool.provider}</span>
+              <StatusBadge tone={pool.available > 0 ? "success" : pool.total === 0 ? "neutral" : "warning"}>
+                {pool.total === 0 ? "Not configured" : `${pool.available} of ${pool.total} available`}
+                {pool.legacyAvailable > 0 ? ` · ${pool.legacyAvailable} legacy` : ""}
+              </StatusBadge>
+            </div>
 
-          {pool.total > 0 && (
-            <div className="table-scroll" style={{ marginTop: 8 }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Slot</th><th>Client ID</th><th>Secret</th><th>Account</th>
-                    <th>Status</th><th>Token</th><th>Last used</th><th>Reqs</th><th>Failovers</th>
-                    <th>Last error</th><th>Legacy</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pool.slots.map((slot) => (
-                    <tr key={slot.label}>
-                      <td>#{slot.label}</td>
-                      <td className="mono" style={{ fontSize: 11 }}>{slot.fingerprint}</td>
-                      <td className="mono" style={{ fontSize: 11 }}>{slot.secretFingerprint}</td>
-                      <td className="hint" style={{ maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={slot.account ?? ""}>{slot.account ?? "—"}</td>
-                      <td>
-                        <span className={`badge ${stateCls[slot.state] ?? "muted"}`}>
-                          <span className="dot" />
-                          {slot.state === "cooling" ? `parked · ${wait(slot.cooldownRemainingMs)}` : slot.state}
-                        </span>
-                      </td>
-                      <td className="hint">{slot.tokenExpiresAt ? `expires in ${until(slot.tokenExpiresAt)}` : "—"}</td>
-                      <td className="hint">{ago(slot.lastUsedAt)}</td>
-                      <td>{slot.requests}</td>
-                      <td>{slot.failovers}</td>
-                      <td className="hint">{slot.lastErrorCode ?? "—"}</td>
-                      <td>
-                        {!slot.legacy ? <span className="hint">n/a</span>
-                          : slot.legacy.present
-                            ? <span className="badge ok" title={`App ID ${slot.legacy.fingerprint} · token ${slot.legacy.secretFingerprint}`}><span className="dot" />{slot.legacy.fingerprint}</span>
-                            : <span className="badge muted" title={slot.legacy.issue ?? ""}><span className="dot" />{slot.legacy.issue === "not configured" ? "none" : "incomplete"}</span>}
-                      </td>
+            {pool.total > 0 && (
+              <div className="overflow-x-auto rounded-md border border-border-strong">
+                <table className="w-full text-[12.5px]">
+                  <thead className="bg-card-elevated">
+                    <tr className="border-b border-border-subtle text-left text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+                      <th className="px-2.5 py-2">Slot</th><th className="px-2.5 py-2">Client ID</th><th className="px-2.5 py-2">Secret</th><th className="px-2.5 py-2">Account</th>
+                      <th className="px-2.5 py-2">Status</th><th className="px-2.5 py-2">Token</th><th className="px-2.5 py-2">Last used</th><th className="px-2.5 py-2">Reqs</th><th className="px-2.5 py-2">Failovers</th>
+                      <th className="px-2.5 py-2">Last error</th><th className="px-2.5 py-2">Legacy</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {pool.slots.map((slot) => (
+                      <tr key={slot.label} className="border-b border-border-subtle last:border-0">
+                        <td className="px-2.5 py-2 text-foreground-secondary">#{slot.label}</td>
+                        <td className="px-2.5 py-2 font-mono text-[11px] text-foreground-muted">{slot.fingerprint}</td>
+                        <td className="px-2.5 py-2 font-mono text-[11px] text-foreground-muted">{slot.secretFingerprint}</td>
+                        <td className="max-w-[130px] truncate px-2.5 py-2 text-foreground-muted" title={slot.account ?? ""}>{slot.account ?? "—"}</td>
+                        <td className="px-2.5 py-2"><StatusBadge tone={stateTone[slot.state] ?? "neutral"}>{slot.state === "cooling" ? `parked · ${wait(slot.cooldownRemainingMs)}` : slot.state}</StatusBadge></td>
+                        <td className="px-2.5 py-2 text-foreground-muted">{slot.tokenExpiresAt ? `expires in ${until(slot.tokenExpiresAt)}` : "—"}</td>
+                        <td className="px-2.5 py-2 text-foreground-muted">{ago(slot.lastUsedAt)}</td>
+                        <td className="px-2.5 py-2 text-foreground-secondary">{slot.requests}</td>
+                        <td className="px-2.5 py-2 text-foreground-secondary">{slot.failovers}</td>
+                        <td className="px-2.5 py-2 text-foreground-muted">{slot.lastErrorCode ?? "—"}</td>
+                        <td className="px-2.5 py-2">
+                          {!slot.legacy ? <span className="text-foreground-muted">n/a</span>
+                            : slot.legacy.present
+                              ? <StatusBadge tone="success" title={`App ID ${slot.legacy.fingerprint} · token ${slot.legacy.secretFingerprint}`}>{slot.legacy.fingerprint}</StatusBadge>
+                              : <StatusBadge tone="neutral" title={slot.legacy.issue ?? ""}>{slot.legacy.issue === "not configured" ? "none" : "incomplete"}</StatusBadge>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-          {pool.issues.length > 0 && (
-            <div className="hint" style={{ marginTop: 6, color: "var(--danger)" }}>
-              {pool.issues.map((i) => <div key={i.slot}>Slot {i.slot}: {i.message}</div>)}
-            </div>
-          )}
-          {pool.total > 0 && pool.available === 0 && (
-            <div className="hint" style={{ marginTop: 6 }}>
-              All {pool.provider} keys are paused. The next one frees up in about {wait(pool.recoversInMs)}.
-            </div>
-          )}
-        </div>
-      ))}
-      <p className="hint" style={{ marginTop: 4 }}>
-        Add backup keys as numbered environment variables (<span className="mono">_2</span>, <span className="mono">_3</span>, …); the app
+            {pool.issues.length > 0 && (
+              <div className="mt-1.5 space-y-0.5 text-[11.5px] text-danger">
+                {pool.issues.map((i) => <div key={i.slot}>Slot {i.slot}: {i.message}</div>)}
+              </div>
+            )}
+            {pool.total > 0 && pool.available === 0 && (
+              <p className="mt-1.5 text-[11.5px] text-foreground-muted">
+                All {pool.provider} keys are paused. The next one frees up in about {wait(pool.recoversInMs)}.
+              </p>
+            )}
+          </div>
+        ))
+      )}
+      <p className="mt-1 text-[11.5px] text-foreground-muted">
+        Add backup keys as numbered environment variables (<code className="font-mono">_2</code>, <code className="font-mono">_3</code>, …); the app
         rotates to the next one automatically when a key is throttled or rejected. Client ids are masked and secrets are shown
         only as their last 4 characters — full keys are never displayed, logged, or returned by the API.
       </p>
-    </section>
+    </Panel>
   );
 }
 
@@ -262,51 +290,53 @@ function ConnectorSettings() {
     setMsg("Timed out — try the app menu: Spotify → Connect to Spotify.");
   };
 
-  const badge = online
-    ? { cls: "ok", label: "Connected to Spotify" }
+  const badge: { tone: Tone; label: string } = online
+    ? { tone: "success", label: "Connected to Spotify" }
     : bridge?.desktopAlive
       ? bridge.spotifyRunning
-        ? { cls: "warn", label: "Spotify running · link inactive" }
-        : { cls: "warn", label: "Spotify not running" }
-      : { cls: "muted", label: "Desktop app not running" };
+        ? { tone: "warning", label: "Spotify running · link inactive" }
+        : { tone: "warning", label: "Spotify not running" }
+      : { tone: "neutral", label: "Desktop app not running" };
 
   return (
-    <section className="panel anim-in">
-      <h3 className="panel-title">Spotify Connection</h3>
-      <div className="kv"><span className="k">Status</span><span className={`badge ${badge.cls}`}><span className="dot" />{badge.label}</span></div>
-      <p className="hint" style={{ marginTop: 8 }}>
+    <Panel title="Spotify Connection">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-[13px] text-foreground-secondary"><Wifi className="size-3.5" aria-hidden /> Status</span>
+        <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+      </div>
+      <p className="mt-2 text-xs text-foreground-muted">
         Lookups read the licensor identifier from your own running Spotify desktop app. Your Spotify login, tokens and cookies are never read or sent anywhere.
       </p>
       {bridge?.desktopAlive ? (
         !online && (
           <>
-            <button className="btn primary btn-sm" style={{ marginTop: 10 }} disabled={connectBusy} onClick={connectNow}>
+            <Button variant="primary" size="sm" className="mt-3" loading={connectBusy} onClick={connectNow} icon={<RefreshCw className="size-3.5" aria-hidden />}>
               {connectBusy ? "Connecting… (Spotify restarts)" : "Connect to Spotify"}
-            </button>
-            <div className="hint" style={{ marginTop: 8, color: "var(--text-muted)" }}>
+            </Button>
+            <p className="mt-2 text-xs text-foreground-muted">
               {bridge.spotifyRunning
                 ? "Spotify was started without the app link (usually by Windows autostart). Connecting restarts Spotify once with the link enabled."
                 : "Spotify will be started with the app link enabled."}
-            </div>
+            </p>
           </>
         )
       ) : (
         <>
-          <div className="hint" style={{ marginTop: 8, color: "var(--text-muted)" }}>
+          <p className="mt-2 text-xs text-foreground-muted">
             The Ocean Distro Finder desktop app is not running. Start it to enable automatic lookups — or pair a client manually below.
-          </div>
-          <button className={`btn ${paired ? "" : "primary"} btn-sm`} style={{ marginTop: 10 }} disabled={busy} onClick={generate}>
+          </p>
+          <Button variant={paired ? "secondary" : "primary"} size="sm" className="mt-3" loading={busy} onClick={generate}>
             {busy ? "Generating…" : paired ? "Re-pair" : "Generate pairing code"}
-          </button>
+          </Button>
           {code && (
-            <div style={{ marginTop: 10 }}>
-              <div className="mono" style={{ fontSize: 22, fontWeight: 700, letterSpacing: 4 }}>{code}</div>
-              <div className="hint" style={{ marginTop: 6 }}>Enter this code in the paired client. It expires in 5 minutes.</div>
+            <div className="mt-3">
+              <div className="font-mono text-[22px] font-bold tracking-[0.2em] text-foreground">{code}</div>
+              <p className="mt-1.5 text-xs text-foreground-muted">Enter this code in the paired client. It expires in 5 minutes.</p>
             </div>
           )}
         </>
       )}
-      {msg && <div className="hint" style={{ marginTop: 8 }}>{msg}</div>}
-    </section>
+      {msg && <p className="mt-2 text-xs text-foreground-muted">{msg}</p>}
+    </Panel>
   );
 }
