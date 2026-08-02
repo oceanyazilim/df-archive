@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Search, Wifi } from "lucide-react";
 import { PageHead as NewPageHead } from "../shared/PageHead";
 import { StatCard } from "../shared/StatCard";
+import { SkeletonStatCard } from "../shared/Skeleton";
 import { EmptyState as NewEmptyState } from "../shared/EmptyState";
 import { StatusBadge, type StatusBadgeProps } from "../shared/StatusBadge";
 import { CopyButton } from "../shared/CopyButton";
@@ -28,10 +29,18 @@ export function UuidDirectoryView() {
     <div>
       <NewPageHead title="UUID Database" description="Direct lookup against the canonical licensor-UUID mapping — exact stored names, protected search." />
       <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Valid records" value={status?.validMappings ?? "—"} />
-        <StatCard label="Total records" value={status?.totalRecords ?? "—"} />
-        <StatCard label="Duplicates" value={status?.duplicateRecords ?? "—"} />
-        <StatCard label="Conflicts" value={status?.conflicts ?? "—"} tone={(status?.conflicts ?? 0) > 0 ? "danger" : "default"} />
+        {status === null ? (
+          <>
+            <SkeletonStatCard /><SkeletonStatCard /><SkeletonStatCard /><SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <StatCard label="Valid records" value={status.validMappings} />
+            <StatCard label="Total records" value={status.totalRecords} />
+            <StatCard label="Duplicates" value={status.duplicateRecords} />
+            <StatCard label="Conflicts" value={status.conflicts} tone={status.conflicts > 0 ? "danger" : "default"} />
+          </>
+        )}
       </div>
       <Panel title="Search">
         <div className="flex gap-2">

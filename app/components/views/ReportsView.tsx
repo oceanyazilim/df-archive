@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { PageHead } from "../shared/PageHead";
 import { StatCard } from "../shared/StatCard";
+import { SkeletonStatCard } from "../shared/Skeleton";
 import { Panel } from "../shared/Card";
 import { Button } from "../shared/Button";
 import { HistoryItem, jget } from "../../lib/types";
@@ -54,9 +55,17 @@ export function ReportsView() {
     <div>
       <PageHead title="Export Center" description="Export your real analysis data — nothing estimated, nothing fabricated." />
       <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Total analyses" value={stats?.total ?? "—"} />
-        <StatCard label="Analyses today" value={stats?.searchesToday ?? "—"} />
-        <StatCard label="Distributor matches" value={stats?.distributorMatches ?? "—"} />
+        {stats === null ? (
+          <>
+            <SkeletonStatCard /><SkeletonStatCard /><SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <StatCard label="Total analyses" value={stats.total} />
+            <StatCard label="Analyses today" value={stats.searchesToday} />
+            <StatCard label="Distributor matches" value={stats.distributorMatches} />
+          </>
+        )}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel title="Lookup History" description="Every analysis with track, artist, ISRC, distributor and status.">

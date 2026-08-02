@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Search } from "lucide-react";
 import { PageHead } from "../shared/PageHead";
 import { StatCard } from "../shared/StatCard";
+import { SkeletonStatCard } from "../shared/Skeleton";
 import { EmptyState } from "../shared/EmptyState";
 import { CopyButton } from "../shared/CopyButton";
 import { Panel } from "../shared/Card";
@@ -44,10 +45,18 @@ export function DistributorDatabasePage() {
       <PageHead title="Distributor Database" description="Distributors observed across your analyses, plus a direct search of the canonical licensor-UUID mapping." />
 
       <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Mapped distributors" value={status?.validMappings ?? "—"} sub="canonical UUID records" />
-        <StatCard label="Observed" value={history ? observed.length : "—"} sub="from your lookup history" />
-        <StatCard label="Duplicate records" value={status?.duplicateRecords ?? "—"} />
-        <StatCard label="Conflicts" value={status?.conflicts ?? "—"} tone={(status?.conflicts ?? 0) > 0 ? "danger" : "default"} sub="same UUID, different names" />
+        {status === null && history === null ? (
+          <>
+            <SkeletonStatCard /><SkeletonStatCard /><SkeletonStatCard /><SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <StatCard label="Mapped distributors" value={status?.validMappings ?? "—"} sub="canonical UUID records" />
+            <StatCard label="Observed" value={history ? observed.length : "—"} sub="from your lookup history" />
+            <StatCard label="Duplicate records" value={status?.duplicateRecords ?? "—"} />
+            <StatCard label="Conflicts" value={status?.conflicts ?? "—"} tone={(status?.conflicts ?? 0) > 0 ? "danger" : "default"} sub="same UUID, different names" />
+          </>
+        )}
       </div>
 
       {conflicts.length > 0 && (
