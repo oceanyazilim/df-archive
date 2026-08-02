@@ -6,16 +6,16 @@
    Solid charcoal surfaces (not translucent-on-black), thin low-opacity borders,
    ocean-blue accent. There is no light mode. */
 :root, :root[data-theme="dark"] {
-  --background: #080B0F;
-  --sidebar: #0B0F14;
-  --header: rgba(14, 18, 24, 0.88);
+  --background: #000000;
+  --sidebar: #000000;
+  --header: rgba(0, 0, 0, 0.88);
   --surface: #11161D;
   --surface-raised: #151B23;
   --surface-hover: #171D26;
   --input-bg: #0D1218;
   --border: rgba(255, 255, 255, 0.12);
   --border-subtle: rgba(255, 255, 255, 0.07);
-  --text-primary: #F4F7FB;
+  --text-primary: #FFFFFF;
   --text-secondary: #919AAA;
   --text-muted: #626C7A;
   --accent: #39BDF8;
