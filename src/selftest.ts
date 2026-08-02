@@ -643,9 +643,11 @@ async function main(): Promise<void> {
   assert(!/filter:\s*invert|filter:\s*brightness|filter:\s*hue/.test(brandLogo) && !/\.brand[\s\S]{0,200}filter:\s*invert/.test(globals), "no CSS-filter recoloring of the logo");
   assert(/object-fit:\s*contain/.test(globals) || /objectFit:\s*"contain"/.test(brandLogo), "logo uses object-fit: contain");
   // 3) Approved locations: exactly ONE BrandLogo (sidebar) — no center/empty-state duplicate.
-  const sidebarSrc = read("app/components/Sidebar.tsx");
+  // Sidebar rendering moved to app/components/layout/AppSidebar.tsx during the UI redesign.
+  const sidebarSrc = read("app/components/layout/AppSidebar.tsx");
   const brandLogoUses =
     (pageSrc.match(/<BrandLogo\b/g) || []).length +
+    (sidebarSrc.match(/<BrandLogo\b/g) || []).length +
     fs.readdirSync("app/components")
       .filter((n) => n.endsWith(".tsx") && n !== "BrandLogo.tsx")
       .reduce((n, f) => n + (read(`app/components/${f}`).match(/<BrandLogo\b/g) || []).length, 0);
@@ -1089,10 +1091,16 @@ async function main(): Promise<void> {
   assert(/byIsrc/.test(catalogSrc) && /titleKey/.test(catalogSrc), "history is matched to the profile by ISRC first, title as fallback");
   assert(/coverage/.test(catalogSrc) && /truncated/.test(catalogSrc), "catalogue reports truncation instead of silently dropping rows");
   assert(!/distributor/i.test(catalogSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")) , "catalogue never fabricates a distributor (resolved separately from the licensor UUID)");
-  const catalogUi = read("app/components/ArtistCatalog.tsx");
-  assert(/soundchartsSongUuid!/.test(catalogUi), "removed rows open by their Soundcharts uuid, so they can still be inspected");
-  assert(/cancelRef/.test(catalogUi) && /Stop/.test(catalogUi), "bulk resolution can be stopped");
-  assert(/Export CSV/.test(catalogUi), "the catalogue can be exported");
+  // The artist-catalogue workspace UI moved from ArtistCatalog.tsx (now just the
+  // shared type contract) to a release-grouped table + drawer during the redesign:
+  // app/lib/hooks/useArtistCatalog.ts (resolution state), app/components/releases/*.
+  const catalogHook = read("app/lib/hooks/useArtistCatalog.ts");
+  const releaseDrawerUi = read("app/components/releases/ReleaseDetailsDrawer.tsx");
+  const releaseFiltersUi = read("app/components/releases/ReleaseFilters.tsx");
+  const exportUtils = read("app/components/releases/exportUtils.ts");
+  assert(/soundchartsSongUuid/.test(releaseDrawerUi) && /openId/.test(releaseDrawerUi), "removed rows open by their Soundcharts uuid, so they can still be inspected");
+  assert(/cancelRef/.test(catalogHook) && /Stop/i.test(releaseFiltersUi), "bulk resolution can be stopped");
+  assert(/export/i.test(exportUtils) && /Export/.test(releaseFiltersUi), "the catalogue can be exported");
 
   console.log("== in-app Ocean Analyzer (Spicetify) ==");
   const inApp = read("spicetify/distro-finder.js");

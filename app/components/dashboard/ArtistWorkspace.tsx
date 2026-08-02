@@ -15,6 +15,7 @@ export interface ArtistWorkspaceProps {
   onExport: () => void;
   onOpenHistory: () => void;
   onOpenAnalyzer: (target: AnalyzerTarget) => void;
+  onAnalyze: (input: string) => void;
   flash: (m: string) => void;
 }
 
@@ -24,7 +25,7 @@ export interface ArtistWorkspaceProps {
  * primary-distributor stat) and the release table/drawer — resolving a
  * track once updates both surfaces.
  */
-export function ArtistWorkspace({ data, fetchedAt, onReanalyze, onExport, onOpenHistory, onOpenAnalyzer, flash }: ArtistWorkspaceProps) {
+export function ArtistWorkspace({ data, fetchedAt, onReanalyze, onExport, onOpenHistory, onOpenAnalyzer, onAnalyze, flash }: ArtistWorkspaceProps) {
   const catalog = useArtistCatalog(data);
   const distributorBreakdown = useMemo(() => resolvedDistributorBreakdown(catalog.resolved), [catalog.resolved]);
 
@@ -38,7 +39,7 @@ export function ArtistWorkspace({ data, fetchedAt, onReanalyze, onExport, onOpen
         onOpenHistory={onOpenHistory}
         distributorBreakdown={distributorBreakdown}
       />
-      <ReleaseCatalog data={data} catalog={catalog} onOpenAnalyzer={onOpenAnalyzer} flash={flash} />
+      <ReleaseCatalog data={data} catalog={catalog} onOpenAnalyzer={onOpenAnalyzer} onAnalyze={onAnalyze} flash={flash} />
     </div>
   );
 }

@@ -23,10 +23,11 @@ export interface ReleaseDetailsDrawerProps {
   resolved: Record<string, Resolved>;
   onClose: () => void;
   onOpenAnalyzer: (target: AnalyzerTarget) => void;
+  onAnalyze: (input: string) => void;
   flash: (m: string) => void;
 }
 
-export function ReleaseDetailsDrawer({ release, resolved, onClose, onOpenAnalyzer, flash }: ReleaseDetailsDrawerProps) {
+export function ReleaseDetailsDrawer({ release, resolved, onClose, onOpenAnalyzer, onAnalyze, flash }: ReleaseDetailsDrawerProps) {
   const [full, setFull] = useState<AlbumRelease | null>(null);
   const [loading, setLoading] = useState(false);
   const isRealAlbum = !!release?.albumId && !release.albumId.startsWith("__no-album-");
@@ -71,8 +72,18 @@ export function ReleaseDetailsDrawer({ release, resolved, onClose, onOpenAnalyze
   const artworkUrl = full?.artworkUrl ?? null;
   const spotifyUrl = isRealAlbum ? `https://open.spotify.com/album/${release.albumId}` : null;
   const trackListSource = full?.tracks.length
-    ? full.tracks.map((t) => ({ spotifyTrackId: t.spotifyTrackId, trackNumber: t.trackNumber, title: t.title, durationMs: t.durationMs, isrc: t.isrc, explicit: t.explicit }))
-    : release.tracks.map((t, i) => ({ spotifyTrackId: t.spotifyTrackId ?? `row-${i}`, trackNumber: t.trackNumber ?? i + 1, title: t.title, durationMs: t.durationMs, isrc: t.isrc, explicit: t.explicit ?? false }));
+    ? full.tracks.map((t) => ({ key: t.spotifyTrackId, spotifyTrackId: t.spotifyTrackId, openId: t.spotifyTrackId, trackNumber: t.trackNumber, title: t.title, durationMs: t.durationMs, isrc: t.isrc, explicit: t.explicit }))
+    : release.tracks.map((t, i) => ({
+        key: t.spotifyTrackId ?? t.soundchartsSongUuid ?? `row-${i}`,
+        spotifyTrackId: t.spotifyTrackId,
+        // Removed-from-profile tracks have no Spotify id — fall back to the Soundcharts uuid so they stay openable.
+        openId: t.spotifyTrackId ?? t.soundchartsSongUuid,
+        trackNumber: t.trackNumber ?? i + 1,
+        title: t.title,
+        durationMs: t.durationMs,
+        isrc: t.isrc,
+        explicit: t.explicit ?? false,
+      }));
 
   return (
     <Drawer
@@ -148,7 +159,7 @@ export function ReleaseDetailsDrawer({ release, resolved, onClose, onOpenAnalyze
 
         <section>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Tracks</h4>
-          {loading ? <Skeleton className="h-40 w-full" /> : <TrackList tracks={trackListSource} resolvedByTrackId={resolvedByTrackId} />}
+          {loading ? <Skeleton className="h-40 w-full" /> : <TrackList tracks={trackListSource} resolvedByTrackId={resolvedByTrackId} onOpenTrack={onAnalyze} />}
         </section>
 
         <section className="flex flex-wrap gap-2 border-t border-border-subtle pt-4">

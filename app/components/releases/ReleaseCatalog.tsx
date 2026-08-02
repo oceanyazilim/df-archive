@@ -13,10 +13,11 @@ export interface ReleaseCatalogProps {
   data: ArtistCatalogData;
   catalog: UseArtistCatalogResult;
   onOpenAnalyzer: (target: AnalyzerTarget) => void;
+  onAnalyze: (input: string) => void;
   flash: (m: string) => void;
 }
 
-export function ReleaseCatalog({ data, catalog, onOpenAnalyzer, flash }: ReleaseCatalogProps) {
+export function ReleaseCatalog({ data, catalog, onOpenAnalyzer, onAnalyze, flash }: ReleaseCatalogProps) {
   const [openRelease, setOpenRelease] = useState<ReleaseRow | null>(null);
   const { resolved, running, resolvable, doneCount, resolveAll, stop, releaseRows } = catalog;
   const cov = data.coverage;
@@ -55,6 +56,7 @@ export function ReleaseCatalog({ data, catalog, onOpenAnalyzer, flash }: Release
         resolved={resolved}
         onClose={() => setOpenRelease(null)}
         onOpenAnalyzer={onOpenAnalyzer}
+        onAnalyze={onAnalyze}
         flash={flash}
       />
     </div>

@@ -5,6 +5,7 @@ import { AppSidebar } from "./components/layout/AppSidebar";
 import { TopNavigation } from "./components/layout/TopNavigation";
 import { MobileNavigation } from "./components/layout/MobileNavigation";
 import { PageContainer } from "./components/layout/PageContainer";
+import { MotionConfig } from "framer-motion";
 import { TooltipProvider } from "./components/shared/Tooltip";
 import { Skeleton } from "./components/shared/Skeleton";
 import { ErrorState } from "./components/shared/ErrorState";
@@ -157,6 +158,7 @@ export default function Page() {
   const openAnalyzer = useCallback((target: AnalyzerTarget) => { setAnalyzerTarget(target); go("analyzer"); }, [go]);
 
   return (
+    <MotionConfig reducedMotion="user">
     <TooltipProvider>
       <div className="relative min-h-screen bg-background">
         <BackgroundFX />
@@ -209,6 +211,7 @@ export default function Page() {
         {toast && <div className="toast anim-pop">{toast}</div>}
       </div>
     </TooltipProvider>
+    </MotionConfig>
   );
 }
 
@@ -273,6 +276,7 @@ function LookupView({ session, artist, running, step, stageList, error, flash, o
         onExport={onOpenReports}
         onOpenHistory={onOpenHistory}
         onOpenAnalyzer={onOpenAnalyzer}
+        onAnalyze={onAnalyze}
         flash={flash}
       />
     );
