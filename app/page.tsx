@@ -10,7 +10,7 @@ import { TooltipProvider } from "./components/shared/Tooltip";
 import { Skeleton } from "./components/shared/Skeleton";
 import { ErrorState } from "./components/shared/ErrorState";
 import { SpotifyUrlInput } from "./components/analyzer/SpotifyUrlInput";
-import { AnalysisProgress } from "./components/analyzer/AnalysisProgress";
+import { LazyOcean3DLoader as Ocean3DLoader } from "./components/loaders/LazyOcean3DLoader";
 import { ArtistWorkspace } from "./components/dashboard/ArtistWorkspace";
 import { OceanAnalyzerPage, type AnalyzerTarget } from "./components/analyzer-details/OceanAnalyzerPage";
 import { parseMusicLookupInput } from "@core/validation/musicInput";
@@ -29,9 +29,8 @@ import {
   View, Health, Workspace, AlbumRelease, jget, overallStatus,
   ALBUM_ID_RE, synthReleaseFromWorkspace,
 } from "./lib/types";
+import { ANALYSIS_SEQUENCE, getAnalysisStatusConfig, stageBandProgress, type AnalysisKind, type AnalysisStatus } from "./lib/analysisState";
 
-const RELEASE_STEPS = ["Validating Spotify URL", "Reading release metadata", "Matching licensor UUID", "Identifying distributor", "Loading streaming analytics", "Preparing workspace"];
-const ARTIST_STEPS = ["Validating Spotify URL", "Fetching artist profile", "Loading release catalog", "Matching licensor UUIDs", "Preparing analytics"];
 export default function Page() {
   const [view, setView] = useState<View>("lookup");
   const [collapsed, setCollapsedState] = useState(false);
@@ -54,8 +53,8 @@ export default function Page() {
   const [artist, setArtist] = useState<{ loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<{ code?: string; message: string } | null>(null);
-  const [step, setStep] = useState(0);
-  const [stageList, setStageList] = useState<string[]>(RELEASE_STEPS);
+  const [analysisKind, setAnalysisKind] = useState<AnalysisKind>("release");
+  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>("idle");
   const [toast, setToast] = useState<string | null>(null);
   const [analyzerTarget, setAnalyzerTarget] = useState<AnalyzerTarget | null>(null);
   const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), 1500); }, []);
@@ -99,10 +98,12 @@ export default function Page() {
   const analyze = useCallback(async (input: string) => {
     setView("lookup");
     if (!input.trim()) return;
-    const steps = parseMusicLookupInput(input.trim()).type === "spotify_artist" ? ARTIST_STEPS : RELEASE_STEPS;
-    setStageList(steps);
-    setRunning(true); setError(null); setStep(0);
-    const ticker = setInterval(() => setStep((s) => Math.min(s + 1, steps.length - 1)), 420);
+    const kind: AnalysisKind = parseMusicLookupInput(input.trim()).type === "spotify_artist" ? "artist" : "release";
+    const seq = ANALYSIS_SEQUENCE[kind];
+    setAnalysisKind(kind);
+    setRunning(true); setError(null); setAnalysisStatus(seq[0]);
+    let seqIdx = 0;
+    const ticker = setInterval(() => { seqIdx = Math.min(seqIdx + 1, seq.length - 1); setAnalysisStatus(seq[seqIdx]); }, 420);
     try {
       const r = await fetch("/api/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: input.trim() }) });
       const data = (await r.json()) as Record<string, unknown>;
@@ -149,7 +150,7 @@ export default function Page() {
       }
       setSession({ release: synthReleaseFromWorkspace(ws), initialTrackId: trackId, seed });
     } catch (e) { setError({ message: (e as Error).message }); }
-    finally { clearInterval(ticker); setRunning(false); setStep(steps.length); }
+    finally { clearInterval(ticker); setRunning(false); }
   }, []);
 
   analyzeRef.current = analyze;
@@ -187,7 +188,7 @@ export default function Page() {
             <div className="view-anim">
               {view === "lookup" && (
                 <LookupView
-                  session={session} artist={artist} running={running} step={step} stageList={stageList} error={error}
+                  session={session} artist={artist} running={running} analysisStatus={analysisStatus} analysisKind={analysisKind} error={error}
                   flash={flash} onAnalyze={analyze}
                   onOpenSettings={() => go("settings")} onOpenReports={() => go("reports")} onOpenHistory={() => go("history")}
                   onOpenAnalyzer={openAnalyzer}
@@ -238,10 +239,10 @@ function SpotifyCooldownBanner({ ms }: { ms: number }) {
 }
 
 /** The Dashboard view: landing hero (no session) or the release workspace. */
-function LookupView({ session, artist, running, step, stageList, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, onOpenAnalyzer, health }: {
+function LookupView({ session, artist, running, analysisStatus, analysisKind, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, onOpenAnalyzer, health }: {
   session: Session | null;
   artist: { loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null;
-  running: boolean; step: number; stageList: string[]; error: { code?: string; message: string } | null;
+  running: boolean; analysisStatus: AnalysisStatus; analysisKind: AnalysisKind; error: { code?: string; message: string } | null;
   flash: (m: string) => void; onAnalyze: (input: string) => void; onOpenSettings: () => void;
   onOpenReports: () => void; onOpenHistory: () => void; onOpenAnalyzer: (target: AnalyzerTarget) => void; health: Health | null;
 }) {
@@ -305,7 +306,23 @@ function LookupView({ session, artist, running, step, stageList, error, flash, o
         </div>
         {running ? (
           <div className="mx-auto mt-8 max-w-2xl">
-            <AnalysisProgress stages={stageList} currentStep={step} />
+            {(() => {
+              const cfg = getAnalysisStatusConfig(analysisStatus, analysisKind);
+              return (
+                <Ocean3DLoader
+                  mode={cfg.loaderMode}
+                  fullscreen={analysisKind === "artist"}
+                  progress={stageBandProgress(analysisStatus, analysisKind)}
+                  stage={cfg.title}
+                  description={cfg.description}
+                  searchSubstage={cfg.searchSubstage}
+                  stages={ANALYSIS_SEQUENCE[analysisKind].map((s) => ({
+                    label: getAnalysisStatusConfig(s, analysisKind).title,
+                    state: s === analysisStatus ? "active" : ANALYSIS_SEQUENCE[analysisKind].indexOf(s) < ANALYSIS_SEQUENCE[analysisKind].indexOf(analysisStatus) ? "done" : "pending",
+                  }))}
+                />
+              );
+            })()}
           </div>
         ) : (
           <LandingStatus health={health} />
@@ -319,11 +336,20 @@ function LookupView({ session, artist, running, step, stageList, error, flash, o
         const d = describeError(error.code, error.message);
         return <ErrorState title={d.title} message={d.message} technicalDetail={error.code} className="mb-4" />;
       })()}
-      {running && (
-        <div className="row anim-in" style={{ marginBottom: 12, gap: 8 }}>
-          <span className="spin" aria-hidden /><span className="hint">{stageList[Math.min(step, stageList.length - 1)]}…</span>
-        </div>
-      )}
+      {running && (() => {
+        const cfg = getAnalysisStatusConfig(analysisStatus, analysisKind);
+        return (
+          <div className="mb-4">
+            <Ocean3DLoader
+              mode={cfg.loaderMode}
+              compact
+              progress={stageBandProgress(analysisStatus, analysisKind)}
+              stage={cfg.title}
+              searchSubstage={cfg.searchSubstage}
+            />
+          </div>
+        );
+      })()}
       <ReleaseWorkspace key={session.release.spotifyAlbumId || session.initialTrackId} session={session} flash={flash} onOpenSettings={onOpenSettings} />
     </>
   );
