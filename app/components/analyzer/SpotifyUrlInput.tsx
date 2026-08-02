@@ -57,7 +57,9 @@ export function SpotifyUrlInput({ variant = "hero", onAnalyze, running, classNam
     onAnalyze(v);
     pushRecent(v);
     setRecent(readRecent());
-    if (!raw) setValue("");
+    // Value is intentionally kept (not cleared) so a failed analysis leaves the
+    // original URL visible and ready to retry, per the error-state requirement
+    // that the original input is always preserved.
     setTouched(false);
   }
 

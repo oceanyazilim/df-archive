@@ -16,10 +16,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../shared/Tabs";
 import { SpotifyUrlInput } from "../analyzer/SpotifyUrlInput";
 import { MetadataOverview } from "./MetadataOverview";
 import { DetectionConfidence } from "./DetectionConfidence";
+import { DistributorNotFoundState } from "../distributor/DistributorNotFoundState";
 import { RawDataViewer } from "./RawDataViewer";
 import { MetadataComparison } from "./MetadataComparison";
 import { dur, fmtDate, NA } from "../../lib/types";
 import type { HistoryItem } from "../../lib/types";
+import { ApiError, describeError } from "../../lib/errorMessages";
 
 export interface AnalyzerTarget {
   kind: AnalyzerKind;
@@ -43,19 +45,22 @@ async function fetchAnalyzer(target: AnalyzerTarget): Promise<AnalyzerResult> {
   const qs = target.licensorUuid ? `?licensorUuid=${encodeURIComponent(target.licensorUuid)}` : "";
   const r = await fetch(`/api/analyzer/${target.kind}/${target.id}${qs}`);
   const j = await r.json();
-  if (j.error) throw new Error(j.error.message);
+  if (j.error) throw new ApiError(j.error.message, j.error.code);
   return j.data as AnalyzerResult;
 }
 
 function useAnalyzer(target: AnalyzerTarget | null) {
-  const [state, setState] = useState<{ loading: boolean; data: AnalyzerResult | null; error: string | null }>({ loading: false, data: null, error: null });
+  const [state, setState] = useState<{ loading: boolean; data: AnalyzerResult | null; error: ApiError | null }>({ loading: false, data: null, error: null });
   useEffect(() => {
     if (!target) { setState({ loading: false, data: null, error: null }); return; }
     let cancelled = false;
     setState({ loading: true, data: null, error: null });
     fetchAnalyzer(target)
       .then((data) => { if (!cancelled) setState({ loading: false, data, error: null }); })
-      .catch((e) => { if (!cancelled) setState({ loading: false, data: null, error: (e as Error).message }); });
+      .catch((e) => {
+        if (cancelled) return;
+        setState({ loading: false, data: null, error: e instanceof ApiError ? e : new ApiError((e as Error).message) });
+      });
     return () => { cancelled = true; };
   }, [target?.kind, target?.id, target?.licensorUuid]); // eslint-disable-line react-hooks/exhaustive-deps
   return state;
@@ -109,9 +114,10 @@ export function OceanAnalyzerPage({ initialTarget }: { initialTarget?: AnalyzerT
         </div>
       )}
 
-      {target && error && (
-        <ErrorState title="Analysis failed" message={error} onRetry={() => setTarget({ ...target })} className="mt-6" />
-      )}
+      {target && error && (() => {
+        const d = describeError(error.code, error.message);
+        return <ErrorState title={d.title} message={d.message} technicalDetail={error.code} onRetry={d.retryable ? () => setTarget({ ...target }) : undefined} className="mt-6" />;
+      })()}
 
       {target && data && (
         <div className="space-y-5">
@@ -145,7 +151,7 @@ export function OceanAnalyzerPage({ initialTarget }: { initialTarget?: AnalyzerT
               </div>
               <SpotifyUrlInput variant="compact" onAnalyze={handleCompareUrl} running={compare.loading} />
               {compare.loading && <div className="mt-4 flex items-center gap-2 text-sm text-foreground-secondary"><Loader2 className="size-4 animate-spin" aria-hidden /> Loading…</div>}
-              {compare.error && <p className="mt-3 text-sm text-danger">{compare.error}</p>}
+              {compare.error && <p className="mt-3 text-sm text-danger">{compare.error.message}</p>}
               {compare.data && (
                 <div className="mt-4">
                   <MetadataComparison a={data} b={compare.data} labelA="Current" labelB="Compared" />
@@ -252,7 +258,21 @@ function DistributorTab({ result }: { result: AnalyzerResult }) {
   if (result.kind !== "track") {
     return <EmptyState title="Distributor detection is per track" description="This app resolves distributors from an exact licensor-UUID match on individual tracks. Open a specific track to see detection results." />;
   }
-  return <DetectionConfidence distributor={result.distributor} />;
+  const notFound = result.distributor.status === "uuid_not_mapped" || result.distributor.status === "uuid_unavailable" || result.distributor.status === "invalid_uuid";
+  return (
+    <div className="space-y-4">
+      <DetectionConfidence distributor={result.distributor} />
+      {notFound && (
+        <DistributorNotFoundState
+          licensorUuid={result.distributor.licensorUuid}
+          spotifyTrackId={result.spotifyTrackId}
+          spotifyAlbumId={result.albumId}
+          trackTitle={result.title}
+          artists={result.artists.map((a) => a.name)}
+        />
+      )}
+    </div>
+  );
 }
 
 function MatchesTab({ result }: { result: AnalyzerResult }) {

@@ -13,6 +13,7 @@ import { AnalysisProgress } from "./components/analyzer/AnalysisProgress";
 import { ArtistWorkspace } from "./components/dashboard/ArtistWorkspace";
 import { OceanAnalyzerPage, type AnalyzerTarget } from "./components/analyzer-details/OceanAnalyzerPage";
 import { parseMusicLookupInput } from "@core/validation/musicInput";
+import { describeError } from "./lib/errorMessages";
 import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
 import type { ArtistCatalogData } from "./components/ArtistCatalog";
@@ -51,7 +52,7 @@ export default function Page() {
   const [session, setSession] = useState<Session | null>(null);
   const [artist, setArtist] = useState<{ loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null>(null);
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ code?: string; message: string } | null>(null);
   const [step, setStep] = useState(0);
   const [stageList, setStageList] = useState<string[]>(RELEASE_STEPS);
   const [toast, setToast] = useState<string | null>(null);
@@ -104,7 +105,7 @@ export default function Page() {
     try {
       const r = await fetch("/api/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: input.trim() }) });
       const data = (await r.json()) as Record<string, unknown>;
-      if (data.error) { setError((data.error as { message: string }).message); return; }
+      if (data.error) { const e = data.error as { code?: string; message: string }; setError({ code: e.code, message: e.message }); return; }
 
       // Artist link → the full catalogue view (a separate, heavier load).
       if (data.kind === "artist") {
@@ -123,7 +124,7 @@ export default function Page() {
 
       if (data.kind === "album") {
         const release = data.release as AlbumRelease;
-        if (!release.tracks.length) { setError("This release has no tracks."); return; }
+        if (!release.tracks.length) { setError({ message: "This release has no tracks." }); return; }
         setArtist(null);
         setSession({ release, initialTrackId: release.tracks[0].spotifyTrackId, seed: null });
         return;
@@ -131,7 +132,7 @@ export default function Page() {
 
       setArtist(null);
       const ws = data as unknown as Workspace;
-      if (ws.errors?.length && !ws.identity.soundchartsSongUuid && !ws.metadata.trackTitle) { setError(ws.errors[0].message); return; }
+      if (ws.errors?.length && !ws.identity.soundchartsSongUuid && !ws.metadata.trackTitle) { setError({ code: ws.errors[0].code, message: ws.errors[0].message }); return; }
       const trackId = ws.identity.spotifyTrackId ?? ws.input.normalized;
       const albumId = ws.identity.spotifyAlbumId;
       const seed = { trackId, ws };
@@ -146,7 +147,7 @@ export default function Page() {
         } catch { /* fall through to a synthetic single-track release */ }
       }
       setSession({ release: synthReleaseFromWorkspace(ws), initialTrackId: trackId, seed });
-    } catch (e) { setError((e as Error).message); }
+    } catch (e) { setError({ message: (e as Error).message }); }
     finally { clearInterval(ticker); setRunning(false); setStep(steps.length); }
   }, []);
 
@@ -237,7 +238,7 @@ function SpotifyCooldownBanner({ ms }: { ms: number }) {
 function LookupView({ session, artist, running, step, stageList, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, onOpenAnalyzer, health }: {
   session: Session | null;
   artist: { loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null;
-  running: boolean; step: number; stageList: string[]; error: string | null;
+  running: boolean; step: number; stageList: string[]; error: { code?: string; message: string } | null;
   flash: (m: string) => void; onAnalyze: (input: string) => void; onOpenSettings: () => void;
   onOpenReports: () => void; onOpenHistory: () => void; onOpenAnalyzer: (target: AnalyzerTarget) => void; health: Health | null;
 }) {
@@ -288,7 +289,10 @@ function LookupView({ session, artist, running, step, stageList, error, flash, o
         </div>
         <div className="mx-auto max-w-2xl">
           <SpotifyUrlInput variant="hero" onAnalyze={onAnalyze} running={running} />
-          {error && !running && <p className="mt-3 text-center text-sm text-danger">{error}</p>}
+          {error && !running && (() => {
+            const d = describeError(error.code, error.message);
+            return <ErrorState title={d.title} message={d.message} technicalDetail={error.code} className="mt-4" />;
+          })()}
           {!running && (
             <p className="mt-2 text-center text-[11.5px] text-foreground-muted">
               Supported: Spotify track / album / artist URL · Spotify URI · ISRC · UPC · Soundcharts song UUID
@@ -307,7 +311,10 @@ function LookupView({ session, artist, running, step, stageList, error, flash, o
   }
   return (
     <>
-      {error && <div className="hint anim-in" style={{ color: "var(--danger)", marginBottom: 10 }}>{error}</div>}
+      {error && (() => {
+        const d = describeError(error.code, error.message);
+        return <ErrorState title={d.title} message={d.message} technicalDetail={error.code} className="mb-4" />;
+      })()}
       {running && (
         <div className="row anim-in" style={{ marginBottom: 12, gap: 8 }}>
           <span className="spin" aria-hidden /><span className="hint">{stageList[Math.min(step, stageList.length - 1)]}…</span>

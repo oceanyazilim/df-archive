@@ -11,6 +11,7 @@ import { ArtworkThumb } from "../shared/ArtworkThumb";
 import { CopyButton } from "../shared/CopyButton";
 import { Skeleton } from "../shared/Skeleton";
 import { DistributorBadge } from "../distributor/DistributorBadge";
+import { DistributorNotFoundState } from "../distributor/DistributorNotFoundState";
 import { TrackList } from "./TrackList";
 import { exportReleaseJson } from "./exportUtils";
 import type { AnalyzerTarget } from "../analyzer-details/OceanAnalyzerPage";
@@ -46,6 +47,14 @@ export function ReleaseDetailsDrawer({ release, resolved, onClose, onOpenAnalyze
     if (release) for (const t of release.tracks) if (t.spotifyTrackId) map[t.spotifyTrackId] = resolved[t.key];
     return map;
   }, [release, resolved]);
+
+  // Distinguish "hasn't been resolved yet" from "resolved and genuinely came back empty" —
+  // only the latter is a real Distributor-Not-Found state, never claimed prematurely.
+  const attemptedAll = release ? release.tracks.every((t) => {
+    const s = resolved[t.key]?.status;
+    return s === "done" || s === "failed";
+  }) : false;
+  const genuinelyNotFound = release ? attemptedAll && release.distributors.length === 0 && release.tracks.some((t) => t.spotifyTrackId) : false;
 
   const warnings = useMemo(() => {
     if (!release) return [];
@@ -92,16 +101,25 @@ export function ReleaseDetailsDrawer({ release, resolved, onClose, onOpenAnalyze
 
         <section>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Distributor Detection</h4>
-          <div className="rounded-md border border-border-strong bg-card p-3">
-            <DistributorBadge distributors={release.distributors} />
-            <p className="mt-2 text-[11.5px] text-foreground-muted">
-              {release.distributors.length > 1
-                ? "This release's tracks resolved to more than one distributor — a real conflict, not a display error."
-                : release.distributors.length === 1
-                ? "Resolved via exact licensor-UUID match through the Spotify connector."
-                : "Not yet resolved. Use “Resolve distributors” on the release table, or open a track below."}
-            </p>
-          </div>
+          {genuinelyNotFound ? (
+            <DistributorNotFoundState
+              licensorUuid={null}
+              spotifyAlbumId={isRealAlbum ? release.albumId : null}
+              releaseTitle={release.title}
+              artists={release.artists}
+            />
+          ) : (
+            <div className="rounded-md border border-border-strong bg-card p-3">
+              <DistributorBadge distributors={release.distributors} />
+              <p className="mt-2 text-[11.5px] text-foreground-muted">
+                {release.distributors.length > 1
+                  ? "This release's tracks resolved to more than one distributor — a real conflict, not a display error."
+                  : release.distributors.length === 1
+                  ? "Resolved via exact licensor-UUID match through the Spotify connector."
+                  : "Not yet resolved. Use “Resolve distributors” on the release table, or open a track below."}
+              </p>
+            </div>
+          )}
         </section>
 
         <section>
