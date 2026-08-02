@@ -6,6 +6,9 @@ import { TopNavigation } from "./components/layout/TopNavigation";
 import { MobileNavigation } from "./components/layout/MobileNavigation";
 import { PageContainer } from "./components/layout/PageContainer";
 import { TooltipProvider } from "./components/shared/Tooltip";
+import { SpotifyUrlInput } from "./components/analyzer/SpotifyUrlInput";
+import { AnalysisProgress } from "./components/analyzer/AnalysisProgress";
+import { parseMusicLookupInput } from "@core/validation/musicInput";
 import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
 import { ArtistCatalogWorkspace, ArtistCatalogData } from "./components/ArtistCatalog";
@@ -20,7 +23,8 @@ import {
   ALBUM_ID_RE, synthReleaseFromWorkspace,
 } from "./lib/types";
 
-const STEPS = ["Validating input", "Loading track metadata", "Resolving track identity", "Loading streaming analytics", "Resolving distributor information", "Preparing track workspace"];
+const RELEASE_STEPS = ["Validating Spotify URL", "Reading release metadata", "Matching licensor UUID", "Identifying distributor", "Loading streaming analytics", "Preparing workspace"];
+const ARTIST_STEPS = ["Validating Spotify URL", "Fetching artist profile", "Loading release catalog", "Matching licensor UUIDs", "Preparing analytics"];
 const VIEW_TITLE: Record<View, string> = {
   lookup: "Track Lookup", history: "Lookup History",
   uuid: "UUID Directory", distributors: "Distributors", artists: "Artists", albums: "Albums", tracks: "Tracks",
@@ -51,6 +55,7 @@ export default function Page() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
+  const [stageList, setStageList] = useState<string[]>(RELEASE_STEPS);
   const [toast, setToast] = useState<string | null>(null);
   const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), 1500); }, []);
   // `analyze` is defined below; the URL-restore effect needs it without
@@ -93,8 +98,10 @@ export default function Page() {
   const analyze = useCallback(async (input: string) => {
     setView("lookup");
     if (!input.trim()) return;
+    const steps = parseMusicLookupInput(input.trim()).type === "spotify_artist" ? ARTIST_STEPS : RELEASE_STEPS;
+    setStageList(steps);
     setRunning(true); setError(null); setStep(0);
-    const ticker = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 420);
+    const ticker = setInterval(() => setStep((s) => Math.min(s + 1, steps.length - 1)), 420);
     try {
       const r = await fetch("/api/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: input.trim() }) });
       const data = (await r.json()) as Record<string, unknown>;
@@ -141,7 +148,7 @@ export default function Page() {
       }
       setSession({ release: synthReleaseFromWorkspace(ws), initialTrackId: trackId, seed });
     } catch (e) { setError((e as Error).message); }
-    finally { clearInterval(ticker); setRunning(false); setStep(STEPS.length); }
+    finally { clearInterval(ticker); setRunning(false); setStep(steps.length); }
   }, []);
 
   analyzeRef.current = analyze;
@@ -176,7 +183,7 @@ export default function Page() {
             {health?.spotifyCooldown?.active && <SpotifyCooldownBanner ms={health.spotifyCooldown.remainingMs} />}
             <div className="view-anim">
               {view === "lookup" && (
-                <LookupView session={session} artist={artist} running={running} step={step} error={error} flash={flash} onAnalyze={analyze} onOpenSettings={() => go("settings")} health={health} />
+                <LookupView session={session} artist={artist} running={running} step={step} stageList={stageList} error={error} flash={flash} onAnalyze={analyze} onOpenSettings={() => go("settings")} health={health} />
               )}
               {view === "history" && <HistoryView onAnalyze={analyze} />}
               {view === "uuid" && <UuidDirectoryView flash={flash} />}
@@ -219,11 +226,11 @@ function SpotifyCooldownBanner({ ms }: { ms: number }) {
   );
 }
 
-/** The Track Lookup view: landing hero (no session) or the release workspace. */
-function LookupView({ session, artist, running, step, error, flash, onAnalyze, onOpenSettings, health }: {
+/** The Dashboard view: landing hero (no session) or the release workspace. */
+function LookupView({ session, artist, running, step, stageList, error, flash, onAnalyze, onOpenSettings, health }: {
   session: Session | null;
   artist: { loading: boolean; data: ArtistCatalogData | null; error: string | null } | null;
-  running: boolean; step: number; error: string | null;
+  running: boolean; step: number; stageList: string[]; error: string | null;
   flash: (m: string) => void; onAnalyze: (input: string) => void; onOpenSettings: () => void; health: Health | null;
 }) {
   // Artist catalogue takes over the view when an artist link was analyzed.
@@ -248,28 +255,31 @@ function LookupView({ session, artist, running, step, error, flash, onAnalyze, o
     return <ArtistCatalogWorkspace data={artist.data} flash={flash} onAnalyze={onAnalyze} onOpenSettings={onOpenSettings} />;
   }
 
-  if (running && !session) {
-    return (
-      <section className="panel anim-in" style={{ maxWidth: 720, margin: "40px auto" }}>
-        <div style={{ fontWeight: 650, fontSize: 15, marginBottom: 4 }}>Analyzing…</div>
-        <ol className="steps" style={{ listStyle: "none", paddingLeft: 0 }}>
-          {STEPS.map((s, i) => <li key={s} className={`step ${i < step ? "done" : i === step ? "active" : ""}`}>{i < step ? "✓" : "•"} {s}</li>)}
-        </ol>
-      </section>
-    );
-  }
   if (!session) {
     return (
       <>
-        <div style={{ textAlign: "center", padding: "48px 0 10px" }} className="anim-in">
-          <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 6px" }}>Track Intelligence</h1>
-          <p className="hint" style={{ fontSize: 13.5, maxWidth: 480, margin: "0 auto" }}>
-            Paste a Spotify track, album or artist URL in the bar above. An artist link opens their full catalogue — every track, its distributor, and anything no longer on the profile.
+        <div className="mx-auto max-w-2xl pb-2 pt-10 text-center">
+          <h1 className="text-[28px] font-semibold tracking-tight text-foreground">Discover the distributor behind any Spotify release.</h1>
+          <p className="mx-auto mt-2 max-w-lg text-sm text-foreground-secondary">
+            Paste an artist, album, or track URL to analyze catalog ownership, metadata, identifiers, and distributor history.
           </p>
-          {error && <div className="hint" style={{ color: "var(--danger)", marginTop: 12 }}>{error}</div>}
-          <div className="hint" style={{ marginTop: 8, fontSize: 12 }}>Supported: Spotify track / album / artist URL · Spotify URI · ISRC · UPC · Soundcharts song UUID</div>
         </div>
-        <LandingStatus health={health} />
+        <div className="mx-auto max-w-2xl">
+          <SpotifyUrlInput variant="hero" onAnalyze={onAnalyze} running={running} />
+          {error && !running && <p className="mt-3 text-center text-sm text-danger">{error}</p>}
+          {!running && (
+            <p className="mt-2 text-center text-[11.5px] text-foreground-muted">
+              Supported: Spotify track / album / artist URL · Spotify URI · ISRC · UPC · Soundcharts song UUID
+            </p>
+          )}
+        </div>
+        {running ? (
+          <div className="mx-auto mt-8 max-w-2xl">
+            <AnalysisProgress stages={stageList} currentStep={step} />
+          </div>
+        ) : (
+          <LandingStatus health={health} />
+        )}
       </>
     );
   }
@@ -278,7 +288,7 @@ function LookupView({ session, artist, running, step, error, flash, onAnalyze, o
       {error && <div className="hint anim-in" style={{ color: "var(--danger)", marginBottom: 10 }}>{error}</div>}
       {running && (
         <div className="row anim-in" style={{ marginBottom: 12, gap: 8 }}>
-          <span className="spin" aria-hidden /><span className="hint">{STEPS[Math.min(step, STEPS.length - 1)]}…</span>
+          <span className="spin" aria-hidden /><span className="hint">{stageList[Math.min(step, stageList.length - 1)]}…</span>
         </div>
       )}
       <ReleaseWorkspace key={session.release.spotifyAlbumId || session.initialTrackId} session={session} flash={flash} onOpenSettings={onOpenSettings} />

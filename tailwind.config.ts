@@ -75,8 +75,8 @@ const config: Config = {
           "100%": { backgroundPosition: "-200% 0" },
         },
         "scan-line": {
-          "0%": { transform: "translateY(-100%)" },
-          "100%": { transform: "translateY(100%)" },
+          "0%": { left: "-10%" },
+          "100%": { left: "110%" },
         },
       },
       animation: {

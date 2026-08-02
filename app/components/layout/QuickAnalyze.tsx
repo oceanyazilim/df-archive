@@ -5,23 +5,11 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Sparkles, X } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { Button } from "../shared/Button";
+import { SpotifyUrlInput } from "../analyzer/SpotifyUrlInput";
 
-/**
- * Quick-analyze entry point reachable from every page (top-right). Opens a
- * compact popover with the same `onAnalyze` used by the dashboard hero input —
- * Phase 4 swaps this inner input for the shared `SpotifyUrlInput` compact variant.
- */
+/** Quick-analyze entry point reachable from every page (top-right nav). */
 export function QuickAnalyze({ onAnalyze, running }: { onAnalyze: (input: string) => void; running: boolean }) {
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("");
-
-  function submit() {
-    const v = value.trim();
-    if (!v || running) return;
-    onAnalyze(v);
-    setOpen(false);
-    setValue("");
-  }
 
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
@@ -35,7 +23,7 @@ export function QuickAnalyze({ onAnalyze, running }: { onAnalyze: (input: string
           align="end"
           sideOffset={10}
           className={cn(
-            "z-dropdown w-[380px] rounded-md border border-border-strong bg-card-elevated p-3 shadow-lg",
+            "z-dropdown w-[400px] rounded-md border border-border-strong bg-card-elevated p-3 shadow-lg",
             "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
             "data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
           )}
@@ -48,20 +36,7 @@ export function QuickAnalyze({ onAnalyze, running }: { onAnalyze: (input: string
               </button>
             </PopoverPrimitive.Close>
           </div>
-          <div className="flex items-center gap-1.5 rounded-sm border border-border-strong bg-input px-2.5 focus-within:border-accent/50">
-            <input
-              autoFocus
-              value={value}
-              disabled={running}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="Track, album, or artist URL…"
-              className="h-9 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-foreground-muted disabled:opacity-60"
-            />
-            <Button variant="primary" size="sm" onClick={submit} disabled={!value.trim()} loading={running}>
-              Analyze
-            </Button>
-          </div>
+          <SpotifyUrlInput variant="compact" running={running} onAnalyze={(v) => { onAnalyze(v); setOpen(false); }} />
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>
