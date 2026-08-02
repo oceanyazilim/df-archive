@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PageHead, EmptyState, ArtworkThumb } from "../ui";
-import { StreamingPerformanceChart, StreamPoint, ChartState } from "../StreamingPerformanceChart";
-import { StreamSummary } from "../StreamSummary";
-import { PlatformComparison } from "../PlatformComparison";
+import { StreamingPerformanceChart, StreamPoint, ChartState } from "../releases/StreamingPerformanceChart";
+import { StreamSummary } from "../releases/StreamSummary";
+import { PlatformComparison } from "../releases/PlatformComparison";
 import { HistoryItem, jget } from "../../lib/types";
 
 type StreamsData = { state: ChartState; points: StreamPoint[]; prevPoints: StreamPoint[] | null; updatedAt: string | null };

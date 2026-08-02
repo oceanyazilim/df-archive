@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StreamingPerformanceChart, StreamPoint, ChartState } from "./StreamingPerformanceChart";
-import { StreamSummary } from "./StreamSummary";
-import { PlatformComparison } from "./PlatformComparison";
+import { StreamingPerformanceChart, StreamPoint, ChartState } from "./releases/StreamingPerformanceChart";
+import { StreamSummary } from "./releases/StreamSummary";
+import { PlatformComparison } from "./releases/PlatformComparison";
 import { CopyButton } from "./ui";
 import { runConnectorLookup, ConnectorLookupResult, ConnectorLookupStage } from "../lib/connector";
 import {

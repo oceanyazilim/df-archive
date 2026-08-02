@@ -23,11 +23,12 @@ export interface StatusBadgeProps extends VariantProps<typeof badgeVariants> {
   children: ReactNode;
   dot?: boolean;
   className?: string;
+  title?: string;
 }
 
-export function StatusBadge({ tone, children, dot = true, className }: StatusBadgeProps) {
+export function StatusBadge({ tone, children, dot = true, className, title }: StatusBadgeProps) {
   return (
-    <span className={cn(badgeVariants({ tone }), className)}>
+    <span title={title} className={cn(badgeVariants({ tone }), className)}>
       {dot && <span className="size-1.5 rounded-full bg-current shrink-0" aria-hidden />}
       {children}
     </span>
