@@ -18,6 +18,8 @@ export interface OceanLogoSceneProps {
   reducedMotion: boolean;
   /** 0-1 external progress driver — used by page-transition (rotation tied to transition progress) and success (settle-to-front). */
   progress01?: number;
+  /** distributor-search only — rotation calms as detection approaches a result, per the spec's per-substage behavior. */
+  searchSubstage?: "metadata" | "uuid" | "alias" | "confidence" | "complete";
 }
 
 /**
@@ -27,7 +29,7 @@ export interface OceanLogoSceneProps {
  * Base idle motion lives here; per-mode elaboration (orbit rings, scan line,
  * data nodes) is layered on top by Ocean3DLoader in Phase D.
  */
-export function OceanLogoScene({ mode, reducedMotion, progress01 }: OceanLogoSceneProps) {
+export function OceanLogoScene({ mode, reducedMotion, progress01, searchSubstage }: OceanLogoSceneProps) {
   const { scene } = useGLTF(oceanModelUrl);
   const cloned = useMemo(() => SkeletonUtils.clone(scene), [scene]);
   const fit = useGltfFit(cloned, 1.6);
@@ -55,14 +57,26 @@ export function OceanLogoScene({ mode, reducedMotion, progress01 }: OceanLogoSce
         break;
       }
       case "page-transition": {
-        // Rotation driven externally by progress01 (see Ocean3DLoader) rather than continuous spin.
+        // Rotation driven by external progress (the transition's own timeline), not a continuous spin —
+        // eased in/out, ~135deg total across the transition, with a small forward scale-in.
+        const p = Math.min(1, Math.max(0, progress01 ?? 0));
+        const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        g.rotation.y = eased * (Math.PI * 0.75);
+        g.scale.setScalar(0.94 + eased * 0.06);
         break;
       }
       case "distributor-search": {
-        // Faster rotation with a small periodic reverse micro-correction, plus a slight Z tilt.
+        // Faster rotation with a small periodic reverse micro-correction, plus a slight Z tilt —
+        // calms as the sub-stage approaches a result (confidence), settles front-on at completion.
+        if (searchSubstage === "complete") {
+          g.rotation.y *= 0.88;
+          g.rotation.z *= 0.88;
+          break;
+        }
+        const speed = searchSubstage === "confidence" ? 0.35 : 0.9;
         const dir = Math.sin(t * 0.35) > 0.85 ? -1 : 1;
-        g.rotation.y += delta * 0.9 * dir;
-        g.rotation.z = Math.sin(t * 0.8) * 0.05;
+        g.rotation.y += delta * speed * dir;
+        g.rotation.z = Math.sin(t * 0.8) * (searchSubstage === "confidence" ? 0.015 : 0.05);
         break;
       }
       case "catalog-analysis": {
