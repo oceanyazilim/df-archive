@@ -5,6 +5,11 @@ import { AppSidebar } from "./components/layout/AppSidebar";
 import { TopNavigation } from "./components/layout/TopNavigation";
 import { MobileNavigation } from "./components/layout/MobileNavigation";
 import { PageContainer } from "./components/layout/PageContainer";
+import { NavigationTransitionProvider, useNavigationTransition } from "./components/providers/NavigationTransitionProvider";
+import { VIEW_TITLE } from "./components/layout/nav-config";
+import { FullscreenLoaderOverlay } from "./components/loaders/FullscreenLoaderOverlay";
+
+const INIT_SUBSTATUSES = ["Preparing workspace", "Loading interface", "Connecting services", "Preparing analyzer"];
 import { MotionConfig } from "framer-motion";
 import { TooltipProvider } from "./components/shared/Tooltip";
 import { Skeleton } from "./components/shared/Skeleton";
@@ -32,6 +37,14 @@ import {
 import { ANALYSIS_SEQUENCE, getAnalysisStatusConfig, stageBandProgress, type AnalysisKind, type AnalysisStatus } from "./lib/analysisState";
 
 export default function Page() {
+  return (
+    <NavigationTransitionProvider>
+      <PageInner />
+    </NavigationTransitionProvider>
+  );
+}
+
+function PageInner() {
   const [view, setView] = useState<View>("lookup");
   const [collapsed, setCollapsedState] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -63,11 +76,27 @@ export default function Page() {
   const analyzeRef = useRef<((input: string) => void) | null>(null);
 
   useEffect(() => {
-    const f = () => jget<Health>("/api/health").then((h) => { setHealth(h); setLastHealthAt(Date.now()); }).catch(() => {});
+    const f = () => jget<Health>("/api/health").then((h) => { setHealth(h); setLastHealthAt(Date.now()); setAppReady(true); }).catch(() => {});
     f();
     const t = setInterval(f, 10000);
     return () => clearInterval(t);
   }, []);
+
+  // App-initialization gate: real (first /api/health response) or a short
+  // cap, whichever comes first — never an arbitrary multi-second delay, so
+  // it can't make the app feel slower than it already is.
+  const [appReady, setAppReady] = useState(false);
+  useEffect(() => {
+    const cap = setTimeout(() => setAppReady(true), 600);
+    return () => clearTimeout(cap);
+  }, []);
+  const [initSubstatus, setInitSubstatus] = useState(INIT_SUBSTATUSES[0]);
+  useEffect(() => {
+    if (appReady) return;
+    let i = 0;
+    const t = setInterval(() => { i = (i + 1) % INIT_SUBSTATUSES.length; setInitSubstatus(INIT_SUBSTATUSES[i]); }, 400);
+    return () => clearInterval(t);
+  }, [appReady]);
 
   // Restore a session from the URL on first load. Two forms are accepted:
   //   ?album={id}&track={id}  — an exact album workspace (internal links)
@@ -118,6 +147,7 @@ export default function Page() {
           const cat = await jget<{ catalog?: ArtistCatalogData; fetchedAt?: string; error?: { message: string } }>(`/api/artist/${artistId}/catalog`);
           if (!cat.catalog) throw new Error(cat.error?.message ?? "Artist catalogue could not be built.");
           setArtist({ loading: false, data: cat.catalog, error: null, fetchedAt: cat.fetchedAt ?? null, artistId });
+          await flashSuccess(false);
         } catch (e) {
           setArtist({ loading: false, data: null, error: (e as Error).message, fetchedAt: null, artistId });
         }
@@ -129,12 +159,14 @@ export default function Page() {
         if (!release.tracks.length) { setError({ message: "This release has no tracks." }); return; }
         setArtist(null);
         setSession({ release, initialTrackId: release.tracks[0].spotifyTrackId, seed: null });
+        await flashSuccess(false);
         return;
       }
 
       setArtist(null);
       const ws = data as unknown as Workspace;
       if (ws.errors?.length && !ws.identity.soundchartsSongUuid && !ws.metadata.trackTitle) { setError({ code: ws.errors[0].code, message: ws.errors[0].message }); return; }
+      const hadWarnings = !!ws.errors?.length;
       const trackId = ws.identity.spotifyTrackId ?? ws.input.normalized;
       const albumId = ws.identity.spotifyAlbumId;
       const seed = { trackId, ws };
@@ -144,24 +176,50 @@ export default function Page() {
           if (alb.kind === "album" && alb.release && alb.release.tracks.length) {
             const initial = alb.release.tracks.some((t) => t.spotifyTrackId === trackId) ? trackId : alb.release.tracks[0].spotifyTrackId;
             setSession({ release: alb.release, initialTrackId: initial, seed });
+            await flashSuccess(hadWarnings);
             return;
           }
         } catch { /* fall through to a synthetic single-track release */ }
       }
       setSession({ release: synthReleaseFromWorkspace(ws), initialTrackId: trackId, seed });
+      await flashSuccess(hadWarnings);
     } catch (e) { setError({ message: (e as Error).message }); }
     finally { clearInterval(ticker); setRunning(false); }
+
+    // Briefly shows the success loader state (decelerating rotation, confirmation
+    // ring, check icon) before the dashboard's staggered reveal takes over —
+    // capped short so it never feels like it's blocking the result.
+    async function flashSuccess(partial: boolean) {
+      setAnalysisStatus(partial ? "partial-success" : "success");
+      await new Promise((resolve) => setTimeout(resolve, 650));
+    }
   }, []);
 
   analyzeRef.current = analyze;
 
-  const go = useCallback((v: View) => { setView(v); setDrawer(false); }, []);
+  const { beginTransition, markReady } = useNavigationTransition();
+  const go = useCallback((v: View) => {
+    if (v !== view) beginTransition(VIEW_TITLE[v]);
+    setView(v);
+    setDrawer(false);
+  }, [view, beginTransition]);
   const openAnalyzer = useCallback((target: AnalyzerTarget) => { setAnalyzerTarget(target); go("analyzer"); }, [go]);
+
+  // PageContainer remounts (key={view}) on every navigation — this fires once
+  // the new view has painted, closing the transition loader (or canceling its
+  // pending show entirely if the switch was faster than the flash-guard delay).
+  useEffect(() => { markReady(); }, [view, markReady]);
 
   return (
     <MotionConfig reducedMotion="user">
     <TooltipProvider>
       <div className="relative min-h-screen bg-background">
+        <FullscreenLoaderOverlay
+          visible={!appReady}
+          mode="app-initialization"
+          title="Ocean Distro Finder is starting"
+          description={initSubstatus}
+        />
         <BackgroundFX />
         <MobileNavigation open={drawer} onClose={() => setDrawer(false)} />
         <AppSidebar

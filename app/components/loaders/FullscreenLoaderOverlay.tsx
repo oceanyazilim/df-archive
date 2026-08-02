@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { overlayFade } from "../../lib/motion";
-import { Ocean3DLoader } from "./Ocean3DLoader";
+import { LazyOcean3DLoader as Ocean3DLoader } from "./LazyOcean3DLoader";
 import { OceanProgressBar } from "./OceanProgressBar";
 import { LoaderStageList, type LoaderStage } from "./LoaderStageList";
 import type { Ocean3DLoaderMode, LoaderProgress } from "./types";
