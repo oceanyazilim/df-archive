@@ -78,10 +78,20 @@ const config: Config = {
           "0%": { left: "-10%" },
           "100%": { left: "110%" },
         },
+        "loader-pulse": {
+          "0%, 100%": { opacity: "1", transform: "scale(1) rotate(0deg)" },
+          "50%": { opacity: "0.72", transform: "scale(1.04) rotate(3deg)" },
+        },
+        "progress-highlight": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(250%)" },
+        },
       },
       animation: {
         shimmer: "shimmer 1.3s ease-in-out infinite",
         "scan-line": "scan-line 1.8s ease-in-out infinite",
+        "loader-pulse": "loader-pulse 2.6s ease-in-out infinite",
+        "progress-highlight": "progress-highlight 1.6s ease-in-out infinite",
       },
     },
   },
