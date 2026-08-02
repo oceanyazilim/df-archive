@@ -3,35 +3,67 @@
 /** System views: UUID Directory, System Status, Settings (theme, background, connector). */
 
 import { useCallback, useEffect, useState } from "react";
-import { PageHead, EmptyState, CopyButton } from "../ui";
+import { Search } from "lucide-react";
+import { PageHead, EmptyState } from "../ui";
+import { PageHead as NewPageHead } from "../shared/PageHead";
+import { StatCard } from "../shared/StatCard";
+import { EmptyState as NewEmptyState } from "../shared/EmptyState";
+import { StatusBadge } from "../shared/StatusBadge";
+import { CopyButton } from "../shared/CopyButton";
+import { Panel } from "../shared/Card";
 import { GradientCustomizer } from "../GradientCustomizer";
 import { queryConnectorState, startPairing, requestBridgeReconnect, queryBridgeCommandResult, ConnectorState } from "../../lib/connector";
 import { Health, jget } from "../../lib/types";
 
-// ---------------- UUID Directory ----------------
-export function UuidDirectoryView({ flash }: { flash: (m: string) => void }) {
+// ---------------- UUID Database ----------------
+export function UuidDirectoryView() {
   const [status, setStatus] = useState<{ validMappings: number; totalRecords: number; duplicateRecords: number; conflicts: number; lastLoadedAt: string | null } | null>(null);
   const [q, setQ] = useState("");
   const [res, setRes] = useState<{ results: { uuid: string; distributor: string }[]; truncated: boolean } | null>(null);
   useEffect(() => { jget("/api/uuid-mapping/status").then(setStatus as never).catch(() => {}); }, []);
   const search = () => fetch(`/api/uuid-mapping/search?q=${encodeURIComponent(q)}`).then((r) => r.json()).then(setRes);
   return (
-    <>
-      <PageHead title="UUID Directory" desc="Distributor UUID mapping — exact stored names, protected search." />
-      <div className="cards" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
-        <div className="card anim-in"><div className="card-label">Valid records</div><div className="card-value">{status?.validMappings ?? "—"}</div></div>
-        <div className="card anim-in"><div className="card-label">Total records</div><div className="card-value">{status?.totalRecords ?? "—"}</div></div>
-        <div className="card anim-in"><div className="card-label">Duplicates</div><div className="card-value">{status?.duplicateRecords ?? "—"}</div></div>
-        <div className={`card anim-in ${(status?.conflicts ?? 0) > 0 ? "err" : ""}`}><div className="card-label">Conflicts</div><div className="card-value">{status?.conflicts ?? "—"}</div></div>
+    <div>
+      <NewPageHead title="UUID Database" description="Direct lookup against the canonical licensor-UUID mapping — exact stored names, protected search." />
+      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatCard label="Valid records" value={status?.validMappings ?? "—"} />
+        <StatCard label="Total records" value={status?.totalRecords ?? "—"} />
+        <StatCard label="Duplicates" value={status?.duplicateRecords ?? "—"} />
+        <StatCard label="Conflicts" value={status?.conflicts ?? "—"} tone={(status?.conflicts ?? 0) > 0 ? "danger" : "default"} />
       </div>
-      <section className="panel anim-in">
-        <div className="row"><input type="text" value={q} placeholder="Search UUID or distributor name" onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") search(); }} style={{ flex: 1 }} aria-label="Search mapping" /><button className="btn" onClick={search}>Search</button></div>
-        <p className="hint" style={{ marginTop: 8 }}>The full mapping is never loaded into the browser — search returns at most 50 rows. Last loaded {status?.lastLoadedAt ? new Date(status.lastLoadedAt).toLocaleString() : "—"}.</p>
-        {res && (res.results.length === 0 ? <EmptyState title="No matches" /> :
-          <div className="table-scroll" style={{ marginTop: 10 }}><table><thead><tr><th>Distributor</th><th>UUID</th><th>Status</th><th /></tr></thead>
-            <tbody>{res.results.map((r) => <tr key={r.uuid}><td className="distributor-value">{r.distributor}</td><td className="mono" style={{ overflowWrap: "anywhere" }}>{r.uuid}</td><td><span className="badge ok"><span className="dot" />Exact</span></td><td><CopyButton value={r.uuid} label="UUID" flash={flash} /> <CopyButton value={r.distributor} label="name" flash={flash} /></td></tr>)}</tbody></table></div>)}
-      </section>
-    </>
+      <Panel title="Search">
+        <div className="flex gap-2">
+          <div className="flex h-9 flex-1 items-center gap-2 rounded-sm border border-border-strong bg-input px-2.5">
+            <Search className="size-3.5 shrink-0 text-foreground-muted" aria-hidden />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") search(); }}
+              placeholder="Search UUID or distributor name"
+              aria-label="Search mapping"
+              className="w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-foreground-muted"
+            />
+          </div>
+        </div>
+        <p className="mt-2 text-[11.5px] text-foreground-muted">
+          The full mapping is never loaded into the browser — search returns at most 50 rows. Last loaded {status?.lastLoadedAt ? new Date(status.lastLoadedAt).toLocaleString() : "—"}.
+        </p>
+        {res && (res.results.length === 0 ? <NewEmptyState title="No matches" className="mt-4" /> : (
+          <div className="mt-4 divide-y divide-border-subtle">
+            {res.results.map((r) => (
+              <div key={r.uuid} className="flex items-center justify-between gap-3 py-2.5">
+                <span className="font-medium text-foreground">{r.distributor}</span>
+                <div className="flex items-center gap-2">
+                  <StatusBadge tone="success">Exact</StatusBadge>
+                  <code className="font-mono text-[11px] text-foreground-muted">{r.uuid}</code>
+                  <CopyButton value={r.uuid} label="" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </Panel>
+    </div>
   );
 }
 

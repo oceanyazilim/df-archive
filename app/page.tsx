@@ -17,7 +17,8 @@ import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
 import type { ArtistCatalogData } from "./components/ArtistCatalog";
 import { HistoryView } from "./components/views/HistoryView";
-import { DistributorsView, ArtistsView, AlbumsView, TracksView } from "./components/views/catalog";
+import { ArtistsView, AlbumsView, TracksView } from "./components/views/catalog";
+import { DistributorDatabasePage } from "./components/distributor/DistributorDatabasePage";
 import { AnalyticsView } from "./components/views/AnalyticsView";
 import { ReportsView } from "./components/views/ReportsView";
 import { UuidDirectoryView, SystemStatusView, SettingsView } from "./components/views/system";
@@ -191,8 +192,8 @@ export default function Page() {
                 />
               )}
               {view === "history" && <HistoryView onAnalyze={analyze} />}
-              {view === "uuid" && <UuidDirectoryView flash={flash} />}
-              {view === "distributors" && <DistributorsView flash={flash} />}
+              {view === "uuid" && <UuidDirectoryView />}
+              {view === "distributors" && <DistributorDatabasePage />}
               {view === "artists" && <ArtistsView />}
               {view === "albums" && <AlbumsView onAnalyze={analyze} />}
               {view === "tracks" && <TracksView onAnalyze={analyze} />}
