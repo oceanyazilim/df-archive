@@ -6,8 +6,11 @@ import { TopNavigation } from "./components/layout/TopNavigation";
 import { MobileNavigation } from "./components/layout/MobileNavigation";
 import { PageContainer } from "./components/layout/PageContainer";
 import { TooltipProvider } from "./components/shared/Tooltip";
+import { Skeleton } from "./components/shared/Skeleton";
+import { ErrorState } from "./components/shared/ErrorState";
 import { SpotifyUrlInput } from "./components/analyzer/SpotifyUrlInput";
 import { AnalysisProgress } from "./components/analyzer/AnalysisProgress";
+import { CatalogDashboard } from "./components/dashboard/CatalogDashboard";
 import { parseMusicLookupInput } from "@core/validation/musicInput";
 import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
@@ -25,13 +28,6 @@ import {
 
 const RELEASE_STEPS = ["Validating Spotify URL", "Reading release metadata", "Matching licensor UUID", "Identifying distributor", "Loading streaming analytics", "Preparing workspace"];
 const ARTIST_STEPS = ["Validating Spotify URL", "Fetching artist profile", "Loading release catalog", "Matching licensor UUIDs", "Preparing analytics"];
-const VIEW_TITLE: Record<View, string> = {
-  lookup: "Track Lookup", history: "Lookup History",
-  uuid: "UUID Directory", distributors: "Distributors", artists: "Artists", albums: "Albums", tracks: "Tracks",
-  analytics: "Streaming Analytics", reports: "Reports",
-  status: "System Status", settings: "Settings",
-};
-
 export default function Page() {
   const [view, setView] = useState<View>("lookup");
   const [collapsed, setCollapsedState] = useState(false);
@@ -51,7 +47,7 @@ export default function Page() {
     });
   }, []);
   const [session, setSession] = useState<Session | null>(null);
-  const [artist, setArtist] = useState<{ loading: boolean; data: ArtistCatalogData | null; error: string | null } | null>(null);
+  const [artist, setArtist] = useState<{ loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
@@ -111,13 +107,13 @@ export default function Page() {
       if (data.kind === "artist") {
         const artistId = String(data.spotifyArtistId ?? "");
         setSession(null);
-        setArtist({ loading: true, data: null, error: null });
+        setArtist({ loading: true, data: null, error: null, fetchedAt: null, artistId });
         try {
-          const cat = await jget<{ catalog?: ArtistCatalogData; error?: { message: string } }>(`/api/artist/${artistId}/catalog`);
+          const cat = await jget<{ catalog?: ArtistCatalogData; fetchedAt?: string; error?: { message: string } }>(`/api/artist/${artistId}/catalog`);
           if (!cat.catalog) throw new Error(cat.error?.message ?? "Artist catalogue could not be built.");
-          setArtist({ loading: false, data: cat.catalog, error: null });
+          setArtist({ loading: false, data: cat.catalog, error: null, fetchedAt: cat.fetchedAt ?? null, artistId });
         } catch (e) {
-          setArtist({ loading: false, data: null, error: (e as Error).message });
+          setArtist({ loading: false, data: null, error: (e as Error).message, fetchedAt: null, artistId });
         }
         return;
       }
@@ -183,7 +179,12 @@ export default function Page() {
             {health?.spotifyCooldown?.active && <SpotifyCooldownBanner ms={health.spotifyCooldown.remainingMs} />}
             <div className="view-anim">
               {view === "lookup" && (
-                <LookupView session={session} artist={artist} running={running} step={step} stageList={stageList} error={error} flash={flash} onAnalyze={analyze} onOpenSettings={() => go("settings")} health={health} />
+                <LookupView
+                  session={session} artist={artist} running={running} step={step} stageList={stageList} error={error}
+                  flash={flash} onAnalyze={analyze}
+                  onOpenSettings={() => go("settings")} onOpenReports={() => go("reports")} onOpenHistory={() => go("history")}
+                  health={health}
+                />
               )}
               {view === "history" && <HistoryView onAnalyze={analyze} />}
               {view === "uuid" && <UuidDirectoryView flash={flash} />}
@@ -227,32 +228,48 @@ function SpotifyCooldownBanner({ ms }: { ms: number }) {
 }
 
 /** The Dashboard view: landing hero (no session) or the release workspace. */
-function LookupView({ session, artist, running, step, stageList, error, flash, onAnalyze, onOpenSettings, health }: {
+function LookupView({ session, artist, running, step, stageList, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, health }: {
   session: Session | null;
-  artist: { loading: boolean; data: ArtistCatalogData | null; error: string | null } | null;
+  artist: { loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null;
   running: boolean; step: number; stageList: string[]; error: string | null;
-  flash: (m: string) => void; onAnalyze: (input: string) => void; onOpenSettings: () => void; health: Health | null;
+  flash: (m: string) => void; onAnalyze: (input: string) => void; onOpenSettings: () => void;
+  onOpenReports: () => void; onOpenHistory: () => void; health: Health | null;
 }) {
   // Artist catalogue takes over the view when an artist link was analyzed.
   if (artist) {
     if (artist.loading) {
       return (
-        <div className="ws-stack">
-          <div className="panel"><div className="skeleton" style={{ height: 80 }} /></div>
-          <div className="metric-grid">{[0, 1, 2, 3].map((i) => <div key={i} className="metric"><div className="skeleton" style={{ height: 52 }} /></div>)}</div>
-          <div className="panel"><div className="skeleton" style={{ height: 320 }} /></div>
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
+          </div>
+          <Skeleton className="h-72 w-full" />
         </div>
       );
     }
     if (artist.error || !artist.data) {
       return (
-        <section className="panel anim-in" style={{ maxWidth: 620, margin: "40px auto" }}>
-          <div style={{ fontWeight: 650, marginBottom: 6 }}>Artist catalogue unavailable</div>
-          <div className="hint" style={{ fontSize: 12 }}>{artist.error ?? "The catalogue could not be built."}</div>
-        </section>
+        <ErrorState
+          title="Artist catalogue unavailable"
+          message={artist.error ?? "The catalogue could not be built."}
+          onRetry={artist.artistId ? () => onAnalyze(`https://open.spotify.com/artist/${artist.artistId}`) : undefined}
+          className="mx-auto mt-10 max-w-lg"
+        />
       );
     }
-    return <ArtistCatalogWorkspace data={artist.data} flash={flash} onAnalyze={onAnalyze} onOpenSettings={onOpenSettings} />;
+    return (
+      <div className="space-y-6">
+        <CatalogDashboard
+          data={artist.data}
+          fetchedAt={artist.fetchedAt}
+          onReanalyze={() => onAnalyze(artist.data!.spotifyUrl)}
+          onExport={onOpenReports}
+          onOpenHistory={onOpenHistory}
+        />
+        <ArtistCatalogWorkspace data={artist.data} flash={flash} onAnalyze={onAnalyze} onOpenSettings={onOpenSettings} />
+      </div>
+    );
   }
 
   if (!session) {

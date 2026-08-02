@@ -41,9 +41,17 @@ export interface ButtonProps
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild, loading, icon, disabled, children, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+    // Radix Slot requires exactly one child — when asChild, the caller owns
+    // the full content (including any icon) inside that single child.
+    if (asChild) {
+      return (
+        <Slot ref={ref} className={cn(buttonVariants({ variant, size }), className)} {...props}>
+          {children}
+        </Slot>
+      );
+    }
     return (
-      <Comp
+      <button
         ref={ref}
         className={cn(buttonVariants({ variant, size }), className)}
         disabled={disabled || loading}
@@ -52,7 +60,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       >
         {loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : icon}
         {children}
-      </Comp>
+      </button>
     );
   }
 );
