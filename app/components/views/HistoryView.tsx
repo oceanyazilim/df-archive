@@ -9,6 +9,8 @@ import { Skeleton } from "../shared/Skeleton";
 import { Button } from "../shared/Button";
 import { StatusBadge, metadataStatusTone } from "../shared/StatusBadge";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
+import { AdminOnlyView } from "../shared/AdminOnlyView";
+import { useIsAdmin } from "../providers/AdminProvider";
 import { HistoryItem, jget, fmtDate } from "../../lib/types";
 
 const STATUS_OPTIONS = ["all", "verified", "unresolved", "conflict"];
@@ -20,6 +22,7 @@ export function HistoryView({ onAnalyze }: { onAnalyze: (input: string) => void 
   const [status, setStatus] = useState("all");
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const isAdmin = useIsAdmin();
 
   const load = useCallback(() => jget<{ items: HistoryItem[] }>("/api/history").then((d) => setItems(d.items)).catch(() => setItems([])), []);
   useEffect(() => { load(); }, [load]);
@@ -38,6 +41,8 @@ export function HistoryView({ onAnalyze }: { onAnalyze: (input: string) => void 
     setConfirmClear(false);
     load();
   }
+
+  if (!isAdmin) return <AdminOnlyView title="Recent Analyses" />;
 
   return (
     <div>

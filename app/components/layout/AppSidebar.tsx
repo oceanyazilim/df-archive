@@ -9,6 +9,7 @@ import { NAV } from "./nav-config";
 import { NavItem } from "./NavItem";
 import { SystemStatusCard } from "./SystemStatusCard";
 import { UserMenu } from "./UserMenu";
+import { useIsAdmin } from "../providers/AdminProvider";
 
 export interface AppSidebarProps {
   view: View;
@@ -22,6 +23,8 @@ export interface AppSidebarProps {
 
 export function AppSidebar({ view, onNavigate, collapsed, onToggleCollapsed, drawerOpen, health, lastHealthAt }: AppSidebarProps) {
   const reduced = useReducedMotion();
+  const isAdmin = useIsAdmin();
+  const nav = NAV.map((group) => ({ ...group, items: group.items.filter((item) => !item.adminOnly || isAdmin) })).filter((group) => group.items.length > 0);
   return (
     <motion.aside
       animate={{ width: collapsed ? 72 : 264 }}
@@ -51,7 +54,7 @@ export function AppSidebar({ view, onNavigate, collapsed, onToggleCollapsed, dra
       </button>
 
       <nav aria-label="Main navigation" className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 pb-2">
-        {NAV.map((group) => (
+        {nav.map((group) => (
           <div key={group.section}>
             {!collapsed && (
               <div className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-foreground-muted">

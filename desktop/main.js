@@ -21,6 +21,9 @@ let serverProc = null;
 let win = null;
 let tray = null;
 let connectorKey = null;
+// Latest bridge status the tray/menu display — same shape reportBridgeStatus()
+// returns, kept here purely for UI text so both surfaces never disagree.
+let lastKnownStatus = null;
 let bridgeTimers = [];
 const inFlight = new Set();
 // True when a healthy Ocean panel already answered on PORT (usually `npm run
@@ -183,17 +186,22 @@ async function ensurePaired() {
       try {
         await api("POST", "/api/connector/bridge-status", { spotifyRunning: false, debuggable: false });
         return true;
-      } catch { /* rejected — pair fresh below */ }
+      } catch (err) {
+        console.warn("[bridge] stored connector key rejected by server, pairing fresh:", err?.message ?? err);
+        connectorKey = null;
+      }
     }
     try {
       const start = await api("POST", "/api/connector/pair/start", {});
       const code = start?.pairingCode ?? start?.code;
-      if (!code) return false;
+      if (!code) { console.warn("[bridge] pair/start returned no pairing code:", start); return false; }
       const done = await api("POST", "/api/connector/pair/complete", { code });
       connectorKey = done?.connectorKey ?? null;
       if (connectorKey) persistKey(connectorKey);
+      else console.warn("[bridge] pair/complete returned no connectorKey:", done);
       return !!connectorKey;
-    } catch {
+    } catch (err) {
+      console.warn("[bridge] pairing failed, will retry next beat:", err?.message ?? err);
       return false;
     }
   })().finally(() => { pairingPromise = null; });
@@ -205,7 +213,8 @@ async function reportBridgeStatus() {
   if (!connectorKey) return null;
   const debuggable = await bridge.isConnected();
   const spotifyRunning = debuggable || (await bridge.isSpotifyRunning());
-  try { await api("POST", "/api/connector/bridge-status", { spotifyRunning, debuggable }); } catch { /* transient */ }
+  try { await api("POST", "/api/connector/bridge-status", { spotifyRunning, debuggable }); }
+  catch (err) { console.warn("[bridge] failed to report bridge status to server:", err?.message ?? err); }
   return { spotifyRunning, debuggable };
 }
 
@@ -315,9 +324,11 @@ function startBridgeLoops() {
   const beat = async () => {
     // Watchdog first: if the server we rely on (own or adopted) went away,
     // bring one back before anything else.
-    if (!(await oceanPanelHealthy())) { await ensureServer(); }
-    if (!(await ensurePaired())) return;
+    if (!(await oceanPanelHealthy())) { console.warn("[bridge] Ocean panel server unhealthy, restarting it"); await ensureServer(); }
+    if (!(await ensurePaired())) { console.warn("[bridge] not paired with server, skipping this heartbeat"); return; }
     const st = await reportBridgeStatus();
+    lastKnownStatus = st;
+    updateTrayStatus();
     // Heartbeat still means "lookups can actually be answered right now".
     if (st?.debuggable) { try { await api("POST", "/api/connector/heartbeat", {}); } catch { /* ignore */ } }
     // Self-heal the Spotify link: if Spotify keeps running without the CDP
@@ -333,7 +344,8 @@ function startBridgeLoops() {
         reconnecting = true;
         try { await bridge.launch(); } catch { /* next beat re-evaluates */ }
         reconnecting = false;
-        await reportBridgeStatus();
+        lastKnownStatus = await reportBridgeStatus();
+        updateTrayStatus();
       }
     } else {
       brokenLinkBeats = 0;
@@ -476,20 +488,43 @@ const TRAY_ICON_DATAURL =
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7" fill="#1db954"/><circle cx="8" cy="8" r="3" fill="#000"/></svg>'
   ).toString("base64");
 
+// Same wording as the web panel's SystemStatusCard, so the tray/menu and the
+// panel never disagree about the Spotify link state.
+function bridgeStatusLabel() {
+  if (!lastKnownStatus) return "Checking…";
+  if (lastKnownStatus.debuggable) return "Connected";
+  if (lastKnownStatus.spotifyRunning) return "Link inactive";
+  return "Spotify closed";
+}
+
+function trayContextMenuTemplate() {
+  return [
+    { label: `Spotify: ${bridgeStatusLabel()}`, enabled: false },
+    { type: "separator" },
+    { label: "Open panel", click: showWindow },
+    { label: "Connect to Spotify", click: connectSpotify },
+    { type: "separator" },
+    { label: "Quit", click: () => { app.isQuitting = true; app.quit(); } },
+  ];
+}
+
 function createTray() {
   if (tray) return;
   const icon = nativeImage.createFromDataURL(TRAY_ICON_DATAURL);
   tray = new Tray(icon);
-  tray.setToolTip("Ocean Distro Finder");
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: "Open panel", click: showWindow },
-      { label: "Connect to Spotify", click: connectSpotify },
-      { type: "separator" },
-      { label: "Quit", click: () => { app.isQuitting = true; app.quit(); } },
-    ])
-  );
   tray.on("double-click", showWindow);
+  updateTrayStatus();
+}
+
+/** Called after every beat() tick — keeps the tray tooltip/menu and the app
+ *  menu's Spotify status line in sync with the real bridge state. No
+ *  separate polling: it just re-renders whatever beat() already computed. */
+function updateTrayStatus() {
+  if (tray) {
+    tray.setToolTip(`Ocean Distro Finder — ${bridgeStatusLabel()}`);
+    tray.setContextMenu(Menu.buildFromTemplate(trayContextMenuTemplate()));
+  }
+  if (Menu.getApplicationMenu()) buildMenu();
 }
 
 function buildMenu() {
@@ -507,6 +542,8 @@ function buildMenu() {
       {
         label: "Spotify",
         submenu: [
+          { label: `Status: ${bridgeStatusLabel()}`, enabled: false },
+          { type: "separator" },
           { label: "Connect to Spotify (restarts it)", click: connectSpotify },
           { label: "Install right-click panel (Spicetify)", click: installCompanion },
           { type: "separator" },

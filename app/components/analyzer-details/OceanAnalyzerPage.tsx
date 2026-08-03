@@ -11,6 +11,8 @@ import { Skeleton } from "../shared/Skeleton";
 import { Button } from "../shared/Button";
 import { StatusBadge, metadataStatusTone } from "../shared/StatusBadge";
 import { CopyButton } from "../shared/CopyButton";
+import { CensoredValue } from "../shared/CensoredValue";
+import { useIsAdmin } from "../providers/AdminProvider";
 import { ArtworkThumb } from "../shared/ArtworkThumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../shared/Tabs";
 import { SpotifyUrlInput } from "../analyzer/SpotifyUrlInput";
@@ -166,7 +168,8 @@ export function OceanAnalyzerPage({ initialTarget }: { initialTarget?: AnalyzerT
 }
 
 function MetadataTab({ result }: { result: AnalyzerResult }) {
-  const rows: { label: string; value: string }[] = [];
+  const isAdmin = useIsAdmin();
+  const rows: { label: string; value: string; censor?: boolean }[] = [];
   if (result.kind === "track") {
     rows.push(
       { label: "Spotify track ID", value: result.spotifyTrackId },
@@ -175,7 +178,7 @@ function MetadataTab({ result }: { result: AnalyzerResult }) {
       { label: "UPC", value: result.upc ?? NA },
       { label: "Label", value: result.label ?? NA },
       { label: "Copyright", value: result.copyrights.join(" · ") || NA },
-      { label: "Soundcharts song UUID", value: result.soundchartsSongUuid ?? NA },
+      { label: "Soundcharts song UUID", value: result.soundchartsSongUuid ?? NA, censor: true },
     );
   } else if (result.kind === "album") {
     rows.push(
@@ -202,10 +205,14 @@ function MetadataTab({ result }: { result: AnalyzerResult }) {
         {rows.map((r) => (
           <div key={r.label} className="flex items-center justify-between gap-4 py-2.5">
             <span className="text-xs text-foreground-muted">{r.label}</span>
-            <span className="flex items-center gap-1.5 text-right font-mono text-[12.5px] text-foreground">
-              {r.value}
-              {r.value !== NA && <CopyButton value={r.value} label="" />}
-            </span>
+            {r.censor && r.value !== NA ? (
+              <CensoredValue value={r.value} isAdmin={isAdmin} copyLabel="" />
+            ) : (
+              <span className="flex items-center gap-1.5 text-right font-mono text-[12.5px] text-foreground">
+                {r.value}
+                {r.value !== NA && <CopyButton value={r.value} label="" />}
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -276,6 +283,7 @@ function DistributorTab({ result }: { result: AnalyzerResult }) {
 }
 
 function MatchesTab({ result }: { result: AnalyzerResult }) {
+  const isAdmin = useIsAdmin();
   if (result.kind !== "track" || !result.distributor.licensorUuid) {
     return <EmptyState title="No match data yet" description="Matches (UUID lookups, aliases) become available once a licensor UUID has been captured for a track." />;
   }
@@ -284,8 +292,7 @@ function MatchesTab({ result }: { result: AnalyzerResult }) {
       <p className="text-xs text-foreground-muted">Match method</p>
       <p className="mt-1 text-sm text-foreground">Exact match against the canonical licensor-UUID mapping (<code className="font-mono text-[11.5px]">json/uuid&apos;s.json</code>). No fuzzy matching, label text, or ISRC/UPC prefixes are used.</p>
       <div className="mt-4 flex items-center gap-2">
-        <code className="rounded bg-input px-2 py-1 font-mono text-[11px] text-foreground-secondary">{result.distributor.licensorUuid}</code>
-        <CopyButton value={result.distributor.licensorUuid} label="" />
+        <CensoredValue value={result.distributor.licensorUuid} isAdmin={isAdmin} copyLabel="" />
       </div>
     </div>
   );
@@ -294,21 +301,24 @@ function MatchesTab({ result }: { result: AnalyzerResult }) {
 function HistoryTab({ result }: { result: AnalyzerResult }) {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const id = result.kind === "track" ? result.spotifyTrackId : result.kind === "album" ? result.spotifyAlbumId : null;
+  const isAdmin = useIsAdmin();
 
   useEffect(() => {
+    if (!isAdmin) return;
     let cancelled = false;
     fetch("/api/history?limit=200")
       .then((r) => r.json())
       .then((d) => { if (!cancelled) setItems(Array.isArray(d.items) ? d.items : []); })
       .catch(() => { if (!cancelled) setItems([]); });
     return () => { cancelled = true; };
-  }, []);
+  }, [isAdmin]);
 
   const matches = useMemo(() => {
     if (!items || !id) return [];
     return items.filter((it) => it.spotifyTrackId === id || it.spotifyAlbumId === id);
   }, [items, id]);
 
+  if (!isAdmin) return <EmptyState title="Admin access required" description="Contact the admin of this website for access to this information." />;
   if (!id) return <EmptyState title="History is tracked per track or release" description="This entity type doesn't have per-analysis history." />;
   if (items === null) return <Skeleton className="h-32 w-full" />;
   if (matches.length === 0) return <EmptyState title="No prior analyses" description="This entity hasn't been analyzed before on this workspace." />;

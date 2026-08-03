@@ -9,7 +9,8 @@ import { StatCard } from "../shared/StatCard";
 import { SkeletonStatCard } from "../shared/Skeleton";
 import { EmptyState as NewEmptyState } from "../shared/EmptyState";
 import { StatusBadge, type StatusBadgeProps } from "../shared/StatusBadge";
-import { CopyButton } from "../shared/CopyButton";
+import { CensoredValue } from "../shared/CensoredValue";
+import { useIsAdmin } from "../providers/AdminProvider";
 import { Panel } from "../shared/Card";
 import { Button } from "../shared/Button";
 import { GradientCustomizer } from "../GradientCustomizer";
@@ -23,6 +24,7 @@ export function UuidDirectoryView() {
   const [status, setStatus] = useState<{ validMappings: number; totalRecords: number; duplicateRecords: number; conflicts: number; lastLoadedAt: string | null } | null>(null);
   const [q, setQ] = useState("");
   const [res, setRes] = useState<{ results: { uuid: string; distributor: string }[]; truncated: boolean } | null>(null);
+  const isAdmin = useIsAdmin();
   useEffect(() => { jget("/api/uuid-mapping/status").then(setStatus as never).catch(() => {}); }, []);
   const search = () => fetch(`/api/uuid-mapping/search?q=${encodeURIComponent(q)}`).then((r) => r.json()).then(setRes);
   return (
@@ -66,8 +68,7 @@ export function UuidDirectoryView() {
                 <span className="font-medium text-foreground">{r.distributor}</span>
                 <div className="flex items-center gap-2">
                   <StatusBadge tone="success">Exact</StatusBadge>
-                  <code className="font-mono text-[11px] text-foreground-muted">{r.uuid}</code>
-                  <CopyButton value={r.uuid} label="" />
+                  <CensoredValue value={r.uuid} isAdmin={isAdmin} copyLabel="" />
                 </div>
               </div>
             ))}

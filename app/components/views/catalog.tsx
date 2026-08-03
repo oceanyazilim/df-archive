@@ -15,10 +15,16 @@ import { Skeleton } from "../shared/Skeleton";
 import { Button } from "../shared/Button";
 import type { HistoryItem } from "../../lib/types";
 import { jget, fmtDate } from "../../lib/types";
+import { AdminOnlyView } from "../shared/AdminOnlyView";
+import { useIsAdmin } from "../providers/AdminProvider";
 
 function useHistory(): HistoryItem[] | null {
+  const isAdmin = useIsAdmin();
   const [items, setItems] = useState<HistoryItem[] | null>(null);
-  useEffect(() => { jget<{ items: HistoryItem[] }>("/api/history?limit=200").then((d) => setItems(d.items)).catch(() => setItems([])); }, []);
+  useEffect(() => {
+    if (!isAdmin) return;
+    jget<{ items: HistoryItem[] }>("/api/history?limit=200").then((d) => setItems(d.items)).catch(() => setItems([]));
+  }, [isAdmin]);
   return items;
 }
 
@@ -33,6 +39,7 @@ function SearchInput({ value, onChange, placeholder }: { value: string; onChange
 
 // ---------------- Artists ----------------
 export function ArtistsView() {
+  const isAdmin = useIsAdmin();
   const items = useHistory();
   const [q, setQ] = useState("");
   const artists = useMemo(() => {
@@ -52,6 +59,8 @@ export function ArtistsView() {
   }, [items]);
 
   const filtered = q.trim() ? artists.filter((a) => a.name.toLowerCase().includes(q.trim().toLowerCase())) : artists;
+
+  if (!isAdmin) return <AdminOnlyView title="Artists" />;
 
   return (
     <div>
@@ -95,6 +104,7 @@ export function ArtistsView() {
 
 // ---------------- Albums ----------------
 export function AlbumsView({ onAnalyze }: { onAnalyze: (input: string) => void }) {
+  const isAdmin = useIsAdmin();
   const items = useHistory();
   const albums = useMemo(() => {
     const map = new Map<string, { key: string; title: string; artist: string; artwork: string | null; releaseDate: string | null; albumId: string | null; distributors: Set<string>; tracks: Set<string>; lastSeen: string }>();
@@ -110,6 +120,8 @@ export function AlbumsView({ onAnalyze }: { onAnalyze: (input: string) => void }
     }
     return [...map.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen));
   }, [items]);
+
+  if (!isAdmin) return <AdminOnlyView title="Releases" />;
 
   return (
     <div>
@@ -145,6 +157,7 @@ export function AlbumsView({ onAnalyze }: { onAnalyze: (input: string) => void }
 
 // ---------------- Tracks ----------------
 export function TracksView({ onAnalyze }: { onAnalyze: (input: string) => void }) {
+  const isAdmin = useIsAdmin();
   const items = useHistory();
   const [q, setQ] = useState("");
   const tracks = useMemo(() => {
@@ -160,6 +173,8 @@ export function TracksView({ onAnalyze }: { onAnalyze: (input: string) => void }
   const filtered = q.trim()
     ? tracks.filter((t) => (t.trackTitle ?? "").toLowerCase().includes(q.trim().toLowerCase()) || (t.artists ?? []).join(" ").toLowerCase().includes(q.trim().toLowerCase()) || (t.isrc ?? "").toLowerCase().includes(q.trim().toLowerCase()))
     : tracks;
+
+  if (!isAdmin) return <AdminOnlyView title="Tracks" />;
 
   return (
     <div>

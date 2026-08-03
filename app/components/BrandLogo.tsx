@@ -8,13 +8,13 @@ import oceanLogo from "../../src/assets/Ocean-Logo.png";
  *
  * Approved variants (used only in the sidebar / mobile-drawer branding, since
  * the sidebar doubles as the mobile nav):
- *   sidebar (32) · collapsedSidebar (28) · emptyState (54)
+ *   sidebar (48) · collapsedSidebar (38) · emptyState (54)
  */
 export type BrandLogoVariant = "sidebar" | "collapsedSidebar" | "emptyState";
 
 const VARIANT_HEIGHT: Record<BrandLogoVariant, number> = {
-  sidebar: 32,
-  collapsedSidebar: 28,
+  sidebar: 48,
+  collapsedSidebar: 38,
   emptyState: 54,
 };
 

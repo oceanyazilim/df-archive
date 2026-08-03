@@ -99,7 +99,7 @@ export function SpotifyUrlInput({ variant = "hero", onAnalyze, running, classNam
           onChange={(e) => { setValue(e.target.value); setTouched(false); }}
           onBlur={() => setTouched(true)}
           onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-          placeholder="Paste a Spotify artist, album, or track URL…"
+          placeholder={isHero ? "Type something… artist, track, album, or UUID" : "Paste a Spotify artist, album, or track URL…"}
           aria-label="Spotify URL to analyze"
           aria-invalid={showInvalid || undefined}
           className={cn(

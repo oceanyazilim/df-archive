@@ -1,6 +1,9 @@
+"use client";
+
 import { CheckCircle2, HelpCircle, XCircle } from "lucide-react";
 import { Panel } from "../shared/Card";
-import { CopyButton } from "../shared/CopyButton";
+import { CensoredValue } from "../shared/CensoredValue";
+import { useIsAdmin } from "../providers/AdminProvider";
 import { cn } from "../../lib/cn";
 import type { AnalyzerDistributor } from "@core/analyzer/service";
 
@@ -19,6 +22,7 @@ const STATUS_META: Record<AnalyzerDistributor["status"], { label: string; tone: 
 export function DetectionConfidence({ distributor }: { distributor: AnalyzerDistributor }) {
   const meta = STATUS_META[distributor.status];
   const Icon = meta.icon;
+  const isAdmin = useIsAdmin();
   return (
     <Panel title="Distributor Detection" description="Exact licensor-UUID match — never inferred from label or title">
       <div className="flex items-start gap-3">
@@ -29,8 +33,7 @@ export function DetectionConfidence({ distributor }: { distributor: AnalyzerDist
           {distributor.name && <p className="mt-3 text-lg font-semibold text-foreground">{distributor.name}</p>}
           {distributor.licensorUuid && (
             <div className="mt-2 flex items-center gap-1.5">
-              <code className="rounded bg-input px-2 py-1 font-mono text-[11px] text-foreground-secondary">{distributor.licensorUuid}</code>
-              <CopyButton value={distributor.licensorUuid} label="" />
+              <CensoredValue value={distributor.licensorUuid} isAdmin={isAdmin} copyLabel="" />
             </div>
           )}
         </div>

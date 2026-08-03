@@ -1,14 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Download, HeartPulse, MoreHorizontal, Settings2 } from "lucide-react";
+import { Download, HeartPulse, Lock, LogOut, MoreHorizontal, Settings2, ShieldCheck } from "lucide-react";
 import { cn } from "../../lib/cn";
 import type { View } from "../../lib/types";
+import { useAdmin } from "../providers/AdminProvider";
+import { AdminLoginDialog } from "../shared/AdminLoginDialog";
 
 const menuItemClass =
   "flex w-full items-center gap-2 rounded-sm px-2.5 py-2 text-left text-[13px] text-foreground-secondary outline-none transition-colors hover:bg-card-hover hover:text-foreground focus-visible:bg-card-hover";
 
 export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: (v: View) => void }) {
+  const { isAdmin, logout } = useAdmin();
+  const [loginOpen, setLoginOpen] = useState(false);
+
   return (
     <div className={cn("flex items-center gap-2.5 border-t border-border-subtle px-3 py-3", collapsed && "justify-center px-0")}>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border-strong bg-gradient-to-br from-accent to-accent-secondary text-[11px] font-bold text-[var(--on-accent)]">
@@ -56,10 +62,30 @@ export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavi
                   <Download className="size-4" aria-hidden /> Export center
                 </button>
               </DropdownMenu.Item>
+              <DropdownMenu.Separator className="my-1 h-px bg-border-subtle" />
+              {isAdmin ? (
+                <DropdownMenu.Item asChild>
+                  <button className={menuItemClass} onClick={() => logout()}>
+                    <LogOut className="size-4" aria-hidden /> Sign out of admin
+                  </button>
+                </DropdownMenu.Item>
+              ) : (
+                <DropdownMenu.Item asChild onSelect={(e) => e.preventDefault()}>
+                  <button className={menuItemClass} onClick={() => setLoginOpen(true)}>
+                    <Lock className="size-4" aria-hidden /> Admin sign-in
+                  </button>
+                </DropdownMenu.Item>
+              )}
+              {isAdmin && (
+                <div className={cn(menuItemClass, "pointer-events-none text-success")}>
+                  <ShieldCheck className="size-4" aria-hidden /> Admin session active
+                </div>
+              )}
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       )}
+      <AdminLoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
     </div>
   );
 }

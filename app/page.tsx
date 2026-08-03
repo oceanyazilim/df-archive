@@ -6,11 +6,12 @@ import { TopNavigation } from "./components/layout/TopNavigation";
 import { MobileNavigation } from "./components/layout/MobileNavigation";
 import { PageContainer } from "./components/layout/PageContainer";
 import { NavigationTransitionProvider, useNavigationTransition } from "./components/providers/NavigationTransitionProvider";
+import { AdminProvider } from "./components/providers/AdminProvider";
 import { VIEW_TITLE } from "./components/layout/nav-config";
 import { FullscreenLoaderOverlay } from "./components/loaders/FullscreenLoaderOverlay";
 
 const INIT_SUBSTATUSES = ["Preparing workspace", "Loading interface", "Connecting services", "Preparing analyzer"];
-import { MotionConfig } from "framer-motion";
+import { motion, MotionConfig } from "framer-motion";
 import { TooltipProvider } from "./components/shared/Tooltip";
 import { Skeleton } from "./components/shared/Skeleton";
 import { ErrorState } from "./components/shared/ErrorState";
@@ -31,16 +32,19 @@ import { ReportsView } from "./components/views/ReportsView";
 import { UuidDirectoryView, SystemStatusView, SettingsView } from "./components/views/system";
 import { EmptyState } from "./components/ui";
 import {
-  View, Health, Workspace, AlbumRelease, jget, overallStatus,
+  View, Health, Workspace, AlbumRelease, jget,
   ALBUM_ID_RE, synthReleaseFromWorkspace,
 } from "./lib/types";
+import { IdleHintMessage } from "./components/dashboard/IdleHintMessage";
 import { ANALYSIS_SEQUENCE, getAnalysisStatusConfig, stageBandProgress, type AnalysisKind, type AnalysisStatus } from "./lib/analysisState";
 
 export default function Page() {
   return (
-    <NavigationTransitionProvider>
-      <PageInner />
-    </NavigationTransitionProvider>
+    <AdminProvider>
+      <NavigationTransitionProvider>
+        <PageInner />
+      </NavigationTransitionProvider>
+    </AdminProvider>
   );
 }
 
@@ -239,7 +243,6 @@ function PageInner() {
             onAnalyze={analyze}
             running={running}
             health={health}
-            onNavigate={go}
           />
           <PageContainer key={view}>
             {health?.spotifyCooldown?.active && <SpotifyCooldownBanner ms={health.spotifyCooldown.remainingMs} />}
@@ -250,7 +253,6 @@ function PageInner() {
                   flash={flash} onAnalyze={analyze}
                   onOpenSettings={() => go("settings")} onOpenReports={() => go("reports")} onOpenHistory={() => go("history")}
                   onOpenAnalyzer={openAnalyzer}
-                  health={health}
                 />
               )}
               {view === "history" && <HistoryView onAnalyze={analyze} />}
@@ -297,12 +299,12 @@ function SpotifyCooldownBanner({ ms }: { ms: number }) {
 }
 
 /** The Dashboard view: landing hero (no session) or the release workspace. */
-function LookupView({ session, artist, running, analysisStatus, analysisKind, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, onOpenAnalyzer, health }: {
+function LookupView({ session, artist, running, analysisStatus, analysisKind, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, onOpenAnalyzer }: {
   session: Session | null;
   artist: { loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null;
   running: boolean; analysisStatus: AnalysisStatus; analysisKind: AnalysisKind; error: { code?: string; message: string } | null;
   flash: (m: string) => void; onAnalyze: (input: string) => void; onOpenSettings: () => void;
-  onOpenReports: () => void; onOpenHistory: () => void; onOpenAnalyzer: (target: AnalyzerTarget) => void; health: Health | null;
+  onOpenReports: () => void; onOpenHistory: () => void; onOpenAnalyzer: (target: AnalyzerTarget) => void;
 }) {
   // Artist catalogue takes over the view when an artist link was analyzed.
   if (artist) {
@@ -328,16 +330,18 @@ function LookupView({ session, artist, running, analysisStatus, analysisKind, er
       );
     }
     return (
-      <ArtistWorkspace
-        data={artist.data}
-        fetchedAt={artist.fetchedAt}
-        onReanalyze={() => onAnalyze(artist.data!.spotifyUrl)}
-        onExport={onOpenReports}
-        onOpenHistory={onOpenHistory}
-        onOpenAnalyzer={onOpenAnalyzer}
-        onAnalyze={onAnalyze}
-        flash={flash}
-      />
+      <motion.div key={artist.data.spotifyUrl} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, ease: [0.22, 0.8, 0.36, 1] }}>
+        <ArtistWorkspace
+          data={artist.data}
+          fetchedAt={artist.fetchedAt}
+          onReanalyze={() => onAnalyze(artist.data!.spotifyUrl)}
+          onExport={onOpenReports}
+          onOpenHistory={onOpenHistory}
+          onOpenAnalyzer={onOpenAnalyzer}
+          onAnalyze={onAnalyze}
+          flash={flash}
+        />
+      </motion.div>
     );
   }
 
@@ -383,7 +387,7 @@ function LookupView({ session, artist, running, analysisStatus, analysisKind, er
             })()}
           </div>
         ) : (
-          <LandingStatus health={health} />
+          <IdleHintMessage className="mx-auto mt-6 max-w-md" />
         )}
       </>
     );
@@ -408,39 +412,15 @@ function LookupView({ session, artist, running, analysisStatus, analysisKind, er
           </div>
         );
       })()}
-      <ReleaseWorkspace key={session.release.spotifyAlbumId || session.initialTrackId} session={session} flash={flash} onOpenSettings={onOpenSettings} />
+      <motion.div
+        key={session.release.spotifyAlbumId || session.initialTrackId}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.22, 0.8, 0.36, 1] }}
+      >
+        <ReleaseWorkspace session={session} flash={flash} onOpenSettings={onOpenSettings} />
+      </motion.div>
     </>
   );
 }
 
-/** Honest, compact landing status — real health + connector state, no fake KPIs. */
-function LandingStatus({ health }: { health: Health | null }) {
-  const [connLabel, setConnLabel] = useState<{ cls: string; label: string }>({ cls: "muted", label: "Checking…" });
-  useEffect(() => {
-    let cancelled = false;
-    const tick = () =>
-      import("./lib/connector").then(({ queryConnectorState }) =>
-        queryConnectorState().then((c) => {
-          if (cancelled) return;
-          setConnLabel(
-            c.connected || c.bridge.debuggable ? { cls: "ok", label: "Online" }
-            : c.bridge.desktopAlive ? { cls: "warn", label: c.bridge.spotifyRunning ? "Link inactive" : "Spotify closed" }
-            : c.paired ? { cls: "warn", label: "Offline" }
-            : { cls: "muted", label: "Not paired" }
-          );
-        }).catch(() => { if (!cancelled) setConnLabel({ cls: "muted", label: "Not detected" }); })
-      );
-    tick();
-    const t = setInterval(tick, 10_000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, []);
-  const st = overallStatus(health);
-  void st;
-  return (
-    <div className="cards anim-in" style={{ gridTemplateColumns: "repeat(3,1fr)", maxWidth: 720, margin: "18px auto 0" }}>
-      <div className="card"><div className="card-label">Distributor mapping</div><div style={{ fontSize: 22, fontWeight: 680, marginTop: 6 }}>{health?.uuidMappingCount ?? "—"}</div><div className="hint" style={{ fontSize: 12 }}>canonical UUID records</div></div>
-      <div className="card"><div className="card-label">Lookup service</div><div style={{ marginTop: 8 }}><span className={`badge ${health?.primaryLookupReady ? "ok" : "muted"}`}><span className="dot" />{health?.primaryLookupReady ? "Operational" : "Not configured"}</span></div><div className="hint" style={{ fontSize: 12, marginTop: 6 }}>track metadata &amp; analytics</div></div>
-      <div className="card"><div className="card-label">Spotify connector</div><div style={{ marginTop: 8 }}><span className={`badge ${connLabel.cls}`}><span className="dot" />{connLabel.label}</span></div><div className="hint" style={{ fontSize: 12, marginTop: 6 }}>resolves the distributor</div></div>
-    </div>
-  );
-}

@@ -7,6 +7,8 @@ import { StatCard } from "../shared/StatCard";
 import { SkeletonStatCard } from "../shared/Skeleton";
 import { Panel } from "../shared/Card";
 import { Button } from "../shared/Button";
+import { AdminOnlyView } from "../shared/AdminOnlyView";
+import { useIsAdmin } from "../providers/AdminProvider";
 import { HistoryItem, jget } from "../../lib/types";
 
 /**
@@ -16,6 +18,7 @@ import { HistoryItem, jget } from "../../lib/types";
 export function ReportsView() {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [stats, setStats] = useState<{ total: number; searchesToday: number; distributorMatches: number; topDistributors: { name: string; count: number }[] } | null>(null);
+  const isAdmin = useIsAdmin();
   useEffect(() => {
     jget<{ items: HistoryItem[] }>("/api/history?limit=200").then((d) => setItems(d.items)).catch(() => setItems([]));
     jget<typeof stats>("/api/history?stats=1").then(setStats).catch(() => {});
@@ -50,6 +53,8 @@ export function ReportsView() {
     dl(`distributor-summary-${new Date().toISOString().slice(0, 10)}.csv`, "distributor,analyses,tracks,artists\n" + rows.join("\n"), "text/csv");
   };
   const mappingJson = () => jget<Record<string, unknown>>("/api/uuid-mapping/status").then((s) => dl(`uuid-mapping-status-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(s, null, 2), "application/json")).catch(() => {});
+
+  if (!isAdmin) return <AdminOnlyView title="Export Center" />;
 
   return (
     <div>

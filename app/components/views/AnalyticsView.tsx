@@ -11,6 +11,8 @@ import { cn } from "../../lib/cn";
 import { StreamingPerformanceChart, StreamPoint, ChartState } from "../releases/StreamingPerformanceChart";
 import { StreamSummary } from "../releases/StreamSummary";
 import { PlatformComparison } from "../releases/PlatformComparison";
+import { AdminOnlyView } from "../shared/AdminOnlyView";
+import { useIsAdmin } from "../providers/AdminProvider";
 import { HistoryItem, jget } from "../../lib/types";
 
 type StreamsData = { state: ChartState; points: StreamPoint[]; prevPoints: StreamPoint[] | null; updatedAt: string | null };
@@ -27,6 +29,7 @@ export function AnalyticsView({ onAnalyze }: { onAnalyze: (input: string) => voi
   const [compare, setCompare] = useState(false);
   const [retrySeq, setRetrySeq] = useState(0);
   const [streams, setStreams] = useState<StreamsData>({ state: "loading", points: [], prevPoints: null, updatedAt: null });
+  const isAdmin = useIsAdmin();
 
   useEffect(() => { jget<{ items: HistoryItem[] }>("/api/history?limit=200").then((d) => setItems(d.items)).catch(() => setItems([])); }, []);
 
@@ -59,6 +62,8 @@ export function AnalyticsView({ onAnalyze }: { onAnalyze: (input: string) => voi
       .catch((e) => { if (e?.name !== "AbortError") setStreams({ state: "unavailable", points: [], prevPoints: null, updatedAt: null }); });
     return () => ctl.abort();
   }, [uuid, days, metric, compare, retrySeq]);
+
+  if (!isAdmin) return <AdminOnlyView title="Performance" />;
 
   return (
     <div>

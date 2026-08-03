@@ -7,6 +7,8 @@ import { NA } from "../../lib/types";
 import { Button } from "../shared/Button";
 import { scaleIn } from "../../lib/motion";
 import { submitUuidFlag } from "../../lib/reviewQueue";
+import { CensoredValue } from "../shared/CensoredValue";
+import { useIsAdmin } from "../providers/AdminProvider";
 
 export interface DistributorNotFoundStateProps {
   licensorUuid: string | null;
@@ -27,6 +29,7 @@ export function DistributorNotFoundState({ licensorUuid, spotifyTrackId, spotify
   const [busy, setBusy] = useState<"add" | "report" | null>(null);
   const [done, setDone] = useState<"add" | "report" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isAdmin = useIsAdmin();
 
   async function submit(reason: "add" | "report") {
     setBusy(reason); setError(null);
@@ -48,7 +51,7 @@ export function DistributorNotFoundState({ licensorUuid, spotifyTrackId, spotify
           </p>
           <div className="mt-2 flex items-center gap-1.5 text-xs text-foreground-muted">
             <span>Licensor UUID:</span>
-            <code className="font-mono text-[11px]">{licensorUuid ?? NA}</code>
+            {licensorUuid ? <CensoredValue value={licensorUuid} isAdmin={isAdmin} copyLabel="" /> : <code className="font-mono text-[11px]">{NA}</code>}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">

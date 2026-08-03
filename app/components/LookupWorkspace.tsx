@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Lock } from "lucide-react";
 import { StreamingPerformanceChart, StreamPoint, ChartState } from "./releases/StreamingPerformanceChart";
 import { StreamSummary } from "./releases/StreamSummary";
 import { PlatformComparison } from "./releases/PlatformComparison";
 import { CopyButton } from "./ui";
+import { useIsAdmin } from "./providers/AdminProvider";
 import { runConnectorLookup, ConnectorLookupResult, ConnectorLookupStage } from "../lib/connector";
 import {
   Workspace, AlbumRelease, TrackStatus, NA,
@@ -345,6 +347,7 @@ function ReleaseMetadataCard({ ws, release, flash, connStage, onRetry, onSetup }
 function PerformanceDetailsCard({ ws, release, flash }: { ws: Workspace; release: AlbumRelease; flash: (m: string) => void }) {
   const m = ws.metadata;
   const licensor = ws.distributor.uuid ?? ws.identity.licensorUuid;
+  const isAdmin = useIsAdmin();
   return (
     <section className="panel ws-card anim-in" style={{ margin: 0 }}>
       <h3 className="panel-title">Performance Details</h3>
@@ -353,8 +356,21 @@ function PerformanceDetailsCard({ ws, release, flash }: { ws: Workspace; release
       <div className="kv"><span className="k">Explicit</span><span className="v">{m.explicit === null ? NA : m.explicit ? "Yes" : "No"}</span></div>
       <div className="kv"><span className="k">Popularity</span><span className="v">{m.popularity == null ? NA : `${m.popularity} / 100`}</span></div>
       <div className="ident-row">
-        <div className="i-label">Licensor UUID{licensor && <CopyButton value={licensor} label="Licensor UUID" flash={flash} small />}</div>
-        <div className="i-value">{licensor ?? NA}</div>
+        <div className="i-label">Licensor UUID{isAdmin && licensor && <CopyButton value={licensor} label="Licensor UUID" flash={flash} small />}</div>
+        {!licensor ? (
+          <div className="i-value">{NA}</div>
+        ) : isAdmin ? (
+          <div className="i-value">{licensor}</div>
+        ) : (
+          <button
+            type="button"
+            className="i-value"
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", background: "none", border: "none", padding: 0, font: "inherit", color: "inherit" }}
+            onClick={() => flash("Contact the admin of this website for access to this information.")}
+          >
+            <Lock size={11} aria-hidden /> ••••••••••••
+          </button>
+        )}
       </div>
       <div className="ident-row">
         <div className="i-label">Spotify Track ID{ws.identity.spotifyTrackId && <CopyButton value={ws.identity.spotifyTrackId} label="track id" flash={flash} small />}</div>

@@ -6,13 +6,15 @@ import type { HistoryItem } from "../../lib/types";
 import { fmtDate } from "../../lib/types";
 import { Drawer } from "../shared/Drawer";
 import { ArtworkThumb } from "../shared/ArtworkThumb";
-import { CopyButton } from "../shared/CopyButton";
+import { CensoredValue } from "../shared/CensoredValue";
+import { useIsAdmin } from "../providers/AdminProvider";
 import { StatusBadge } from "../shared/StatusBadge";
 import { Skeleton } from "../shared/Skeleton";
 import type { ObservedDistributor } from "./DistributorDatabaseTable";
 
 export function DistributorDetailsDrawer({ distributor, history, onClose }: { distributor: ObservedDistributor | null; history: HistoryItem[]; onClose: () => void }) {
   const [canonical, setCanonical] = useState<{ uuid: string; distributor: string }[] | null>(null);
+  const isAdmin = useIsAdmin();
 
   useEffect(() => {
     setCanonical(null);
@@ -39,8 +41,7 @@ export function DistributorDetailsDrawer({ distributor, history, onClose }: { di
             <div className="space-y-1.5">
               {canonical.map((c) => (
                 <div key={c.uuid} className="flex items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 py-2">
-                  <code className="truncate font-mono text-[11.5px] text-foreground-secondary">{c.uuid}</code>
-                  <CopyButton value={c.uuid} label="" />
+                  <CensoredValue value={c.uuid} isAdmin={isAdmin} copyLabel="" />
                 </div>
               ))}
             </div>

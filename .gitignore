@@ -12,6 +12,7 @@ out/
 credentials.json
 secrets.json
 next-env.d.ts
+tsconfig.tsbuildinfo
 .DS_Store
 .data/
 .claude/settings.local.json

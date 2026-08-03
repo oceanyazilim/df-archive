@@ -6,6 +6,7 @@ import { Panel } from "../shared/Card";
 import { EmptyState } from "../shared/EmptyState";
 import { StatusBadge, metadataStatusTone } from "../shared/StatusBadge";
 import { Skeleton } from "../shared/Skeleton";
+import { useIsAdmin } from "../providers/AdminProvider";
 import type { HistoryItem } from "../../lib/types";
 
 function timeAgo(iso: string): string {
@@ -22,15 +23,19 @@ function timeAgo(iso: string): string {
 /** Real recent-analysis feed from /api/history — never fake e-commerce-style activity. */
 export function RecentActivity({ onOpenHistory }: { onOpenHistory: () => void }) {
   const [items, setItems] = useState<HistoryItem[] | null>(null);
+  const isAdmin = useIsAdmin();
 
   useEffect(() => {
+    if (!isAdmin) return;
     let cancelled = false;
     fetch("/api/history?limit=6")
       .then((r) => r.json())
       .then((d) => { if (!cancelled) setItems(Array.isArray(d.items) ? d.items : []); })
       .catch(() => { if (!cancelled) setItems([]); });
     return () => { cancelled = true; };
-  }, []);
+  }, [isAdmin]);
+
+  if (!isAdmin) return null;
 
   return (
     <Panel

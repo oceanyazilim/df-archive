@@ -8,8 +8,7 @@ import type { Health, View } from "../../lib/types";
 import { overallStatus } from "../../lib/types";
 import { IconButton } from "../shared/IconButton";
 import { EmptyState } from "../shared/EmptyState";
-import { GlobalSearch } from "./GlobalSearch";
-import { QuickAnalyze } from "./QuickAnalyze";
+import { HeaderAnalyzeInput } from "./HeaderAnalyzeInput";
 import { VIEW_SECTION, VIEW_TITLE } from "./nav-config";
 
 export interface TopNavigationProps {
@@ -18,7 +17,6 @@ export interface TopNavigationProps {
   onAnalyze: (input: string) => void;
   running: boolean;
   health: Health | null;
-  onNavigate: (v: View) => void;
 }
 
 function useFullscreen() {
@@ -33,7 +31,7 @@ function useFullscreen() {
   return { fs, toggle };
 }
 
-export function TopNavigation({ view, onToggleSidebar, onAnalyze, running, health, onNavigate }: TopNavigationProps) {
+export function TopNavigation({ view, onToggleSidebar, onAnalyze, running, health }: TopNavigationProps) {
   const st = overallStatus(health);
   const { fs, toggle } = useFullscreen();
 
@@ -47,12 +45,10 @@ export function TopNavigation({ view, onToggleSidebar, onAnalyze, running, healt
       </div>
 
       <div className="flex flex-1 justify-center px-2">
-        <GlobalSearch onOpenDistributors={() => onNavigate("distributors")} />
+        <HeaderAnalyzeInput onAnalyze={onAnalyze} running={running} />
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <QuickAnalyze onAnalyze={onAnalyze} running={running} />
-
         <span
           className={cn(
             "hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium md:inline-flex",

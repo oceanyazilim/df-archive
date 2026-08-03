@@ -9,6 +9,8 @@ export interface NavLeaf {
   view: View;
   label: string;
   icon: LucideIcon;
+  /** Records every past query across the tool — admin-only, hidden for regular users. */
+  adminOnly?: boolean;
 }
 
 export interface NavSection {
@@ -28,28 +30,28 @@ export const NAV: NavSection[] = [
     items: [
       { view: "lookup", label: "Dashboard", icon: LayoutDashboard },
       { view: "lookup", label: "Analyze URL", icon: ScanSearch },
-      { view: "history", label: "Recent Analyses", icon: History },
+      { view: "history", label: "Recent Analyses", icon: History, adminOnly: true },
     ],
   },
   {
     section: "Catalog",
     items: [
-      { view: "artists", label: "Artists", icon: Users },
-      { view: "albums", label: "Releases", icon: Disc3 },
-      { view: "tracks", label: "Tracks", icon: Music2 },
+      { view: "artists", label: "Artists", icon: Users, adminOnly: true },
+      { view: "albums", label: "Releases", icon: Disc3, adminOnly: true },
+      { view: "tracks", label: "Tracks", icon: Music2, adminOnly: true },
       { view: "distributors", label: "Distributor Database", icon: Building2 },
     ],
   },
   {
     section: "Analytics",
-    items: [{ view: "analytics", label: "Performance", icon: Activity }],
+    items: [{ view: "analytics", label: "Performance", icon: Activity, adminOnly: true }],
   },
   {
     section: "Tools",
     items: [
       { view: "analyzer", label: "Ocean Analyzer", icon: Telescope },
       { view: "uuid", label: "UUID Database", icon: KeyRound },
-      { view: "reports", label: "Export Center", icon: Download },
+      { view: "reports", label: "Export Center", icon: Download, adminOnly: true },
     ],
   },
   {
