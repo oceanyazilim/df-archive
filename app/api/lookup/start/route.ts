@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractSpotifyTrackId } from "@core/spotifyMetadata";
-import { createLookup } from "@core/connectorStore";
+import { createLookup, ensureBridgeReady } from "@core/connectorStore";
 import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
@@ -27,6 +27,9 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  // Repair the Spotify link in the background if it is down, so the lookup
+  // that is about to wait has a chance of being answered.
+  ensureBridgeReady();
   const lookup = createLookup(trackId);
   return NextResponse.json({
     requestId: lookup.requestId,

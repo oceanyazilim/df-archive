@@ -94,6 +94,19 @@ let loaded = false;
 // Set when a refresh is rejected — the UI shows "reconnect", requests fall
 // back to the app-key pool, and a successful reconnect clears it.
 let needsReauth = false;
+/**
+ * Why the last attempt failed, kept in memory for the UI.
+ *
+ * Without this the reason only ever appeared on the throwaway callback tab,
+ * which the user closes before anyone reads it — the app then just looked
+ * like it "didn't connect", with nothing to act on.
+ */
+let lastFailure: { at: number; code: string; message: string } | null = null;
+
+export function recordAuthFailure(code: string, message: string): void {
+  lastFailure = { at: Date.now(), code, message: String(message).slice(0, 300) };
+  logger.warn({ event: "spotify_account_auth_failed", errorCategory: code });
+}
 
 function ensureLoaded(): void {
   if (loaded) return;
@@ -195,7 +208,7 @@ export async function completeAuth(
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok || typeof json.access_token !== "string" || typeof json.refresh_token !== "string") {
     const why = typeof json.error_description === "string" ? json.error_description : `HTTP ${res.status}`;
-    logger.warn({ event: "spotify_account_exchange_failed", matchStatus: why });
+    recordAuthFailure("EXCHANGE_FAILED", why);
     return { ok: false, code: "EXCHANGE_FAILED", message: `Spotify did not accept the authorization (${why}).` };
   }
 
@@ -235,6 +248,7 @@ export async function completeAuth(
     profile,
   };
   needsReauth = false;
+  lastFailure = null;
   persist();
   logger.info({ event: "spotify_account_connected", matchStatus: profile.id || "unknown" });
   // Tell the license panel which account this installation belongs to — the
@@ -258,6 +272,7 @@ export function accountStatus(): {
   profile: SpotifyProfile | null;
   scope: string | null;
   connectedAt: string | null;
+  lastFailure: { at: string; code: string; message: string } | null;
 } {
   ensureLoaded();
   return {
@@ -266,6 +281,7 @@ export function accountStatus(): {
     profile: account ? account.profile : null,
     scope: account ? account.scope : null,
     connectedAt: account ? new Date(account.connectedAt).toISOString() : null,
+    lastFailure: lastFailure ? { at: new Date(lastFailure.at).toISOString(), code: lastFailure.code, message: lastFailure.message } : null,
   };
 }
 

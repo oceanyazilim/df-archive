@@ -199,6 +199,27 @@ export function requestBridgeCommand(action: unknown): { ok: true; id: string } 
   return { ok: true, id: cmd.id };
 }
 
+/**
+ * Called when a lookup needs the Spotify link and it is not up.
+ *
+ * Without this a customer's very first query just times out: the desktop
+ * shell only reconnects on its 30s beat or when someone presses a button in
+ * Settings, and nobody tells them to. Queueing the reconnect here means the
+ * app repairs itself while the lookup is still waiting. Rate-limited so a
+ * burst of lookups cannot restart Spotify repeatedly.
+ */
+let lastAutoBridgeRequestAt = 0;
+export function ensureBridgeReady(): boolean {
+  const status = connectorStatus();
+  if (status.bridge.debuggable) return true;
+  // No desktop shell at all — there is nothing to ask.
+  if (!status.bridge.desktopAlive) return false;
+  if (now() - lastAutoBridgeRequestAt < 60_000) return false;
+  lastAutoBridgeRequestAt = now();
+  pendingBridgeCommand = { id: token(8), action: "reconnect", createdAt: now() };
+  return false;
+}
+
 /** Desktop-side (authorized): take the pending command, if any. */
 export function takeBridgeCommand(): BridgeCommand | null {
   const cmd = pendingBridgeCommand;

@@ -359,6 +359,7 @@ type SpotifyAccountState = {
   } | null;
   connectedAt: string | null;
   setup?: { configured: boolean; clientIdHint: string | null; redirectUri: string };
+  lastFailure?: { at: string; code: string; message: string } | null;
 };
 
 /**
@@ -495,6 +496,15 @@ function SpotifyAccountSettings() {
         )}
       </div>
       {msg && <p className="mt-2 text-xs text-foreground-muted">{msg}</p>}
+
+      {/* The real reason the last attempt failed, kept by the server — the
+          callback tab that displayed it is long closed by now. */}
+      {!connected && st?.lastFailure && (
+        <div className="mt-3 rounded-md border border-danger/25 bg-danger/5 p-3 text-[12px] text-foreground-secondary">
+          <span className="font-medium text-danger">Last attempt failed</span> · {new Date(st.lastFailure.at).toLocaleString()}
+          <p className="mt-1">{st.lastFailure.message}</p>
+        </div>
+      )}
 
       {/* Connecting fails for exactly two reasons in practice: the redirect URI
           is not registered on the Spotify app, or the account is not on that

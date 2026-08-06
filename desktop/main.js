@@ -326,6 +326,48 @@ async function answerPlaylistFetch(reqInfo) {
   }
 }
 
+/**
+ * First-run setup — everything a customer would otherwise have to do by hand.
+ *
+ * Runs once per installation: makes every way Spotify starts carry the app
+ * link, starts Spotify if it is closed, and installs the in-Spotify companion
+ * (including the Spicetify CLI itself, which the installer now fetches when
+ * missing). Failures are logged, never dialogs: the app still works for panel
+ * lookups without the right-click companion.
+ */
+function setupMarkerPath() {
+  return path.join(app.getPath("userData"), "setup-done.json");
+}
+
+async function firstRunSetup() {
+  if (fs.existsSync(setupMarkerPath())) return;
+  console.log("[setup] first run — preparing the Spotify integration");
+  try {
+    await bridge.patchLaunchEntries().catch(() => {});
+
+    // Start Spotify with the link if it is not already reachable; without it
+    // the first lookup has nothing to read from.
+    if (!(await bridge.isConnected())) {
+      try { await bridge.launch(); } catch (e) { console.warn("[setup] could not start Spotify:", e?.message || e); }
+    }
+
+    if (!companionEverInstalled()) {
+      const wasRunning = await bridge.isSpotifyRunning();
+      if (wasRunning) await bridge.killSpotify();
+      const { code, output } = await runCompanionInstaller(["--no-restart"]);
+      console.log(code === 0 ? "[setup] companion installed" : `[setup] companion install failed (${code}): ${output.trim().slice(-400)}`);
+      try { await bridge.launch(); } catch { /* the beat loop retries */ }
+    }
+
+    lastKnownStatus = await reportBridgeStatus();
+    updateTrayStatus();
+  } finally {
+    // Marked done even on failure: the beat-loop watchdog keeps retrying the
+    // parts that matter, and a customer must never sit through this twice.
+    try { fs.writeFileSync(setupMarkerPath(), JSON.stringify({ at: new Date().toISOString() }), { mode: 0o600 }); } catch { /* best effort */ }
+  }
+}
+
 let reconnecting = false;
 let brokenLinkBeats = 0;
 let lastAutoReconnectAt = 0;
@@ -492,12 +534,17 @@ function spotifyAppsDir() {
   return path.join(process.env.APPDATA || "", "Spotify", "Apps");
 }
 
+/** Has the companion ever been installed on this machine? */
+function companionEverInstalled() {
+  return fs.existsSync(path.join(process.env.APPDATA || "", "spicetify", "Extensions", "distro-finder.js"));
+}
+
 /** True only when the companion WAS installed here and a Spotify update wiped it. */
 function companionWiped() {
   try {
-    // Opt-in guard: never install on a machine where it was never set up.
-    const everInstalled = fs.existsSync(path.join(process.env.APPDATA || "", "spicetify", "Extensions", "distro-finder.js"));
-    if (!everInstalled) return false;
+    // Opt-in guard: never "repair" on a machine where it was never set up —
+    // first-time installs go through firstRunSetup() instead.
+    if (!companionEverInstalled()) return false;
     const apps = spotifyAppsDir();
     if (!fs.existsSync(apps)) return false; // Spotify not installed
     // Patched state = extracted xpui folder carrying our extension and no
@@ -724,6 +771,8 @@ if (!gotLock) {
     // If Spotify updated itself while this app was not running, the companion
     // is already gone at boot — check once right away, not only on the beat.
     maybeRepairCompanion().catch(() => {});
+    // A fresh installation sets itself up: no terminal, no manual Spicetify.
+    firstRunSetup().catch((e) => console.warn("[setup] first-run setup failed:", e?.message || e));
   });
 
   // Tray keeps the app alive with every window closed — quit comes from the

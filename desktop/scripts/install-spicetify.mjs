@@ -56,21 +56,64 @@ function buildMapping(file) {
   return { map: Object.fromEntries(byUuid), conflicts: conflicts.size, total: records.length };
 }
 
-function spicetify(args) {
-  // shell:true so spicetify.exe resolves through PATH on Windows.
-  return spawnSync("spicetify", args, { shell: true, encoding: "utf8" });
+/**
+ * Locate the Spicetify CLI.
+ *
+ * PATH alone is not enough: the official installer adds its folder to the
+ * user's PATH, but an already-running process (this one, or the desktop app
+ * that forked it) keeps the old environment — so a freshly installed CLI is
+ * invisible until the app restarts. Resolving the executable path directly
+ * makes the install usable immediately.
+ */
+function resolveSpicetify() {
+  const candidates = [
+    "spicetify", // PATH, when the environment already has it
+    path.join(process.env.LOCALAPPDATA || "", "spicetify", "spicetify.exe"),
+    path.join(process.env.APPDATA || "", "spicetify", "spicetify.exe"),
+    path.join(os.homedir(), ".spicetify", "spicetify.exe"),
+    path.join(os.homedir(), ".spicetify", "spicetify"),
+  ];
+  for (const bin of candidates) {
+    if (bin !== "spicetify" && !fs.existsSync(bin)) continue;
+    const r = spawnSync(bin, ["--version"], { shell: bin === "spicetify", encoding: "utf8" });
+    if (!r.error && r.status === 0) return { bin, version: (r.stdout || "").trim() };
+  }
+  return null;
 }
 
-const probe = spicetify(["--version"]);
-if (probe.error || probe.status !== 0) {
+/**
+ * Install the Spicetify CLI with its official script. Customers must never be
+ * asked to run terminal commands, so the app does this itself — but only on
+ * Windows, and only when the CLI is genuinely absent.
+ */
+function installSpicetifyCli() {
+  if (process.platform !== "win32") return null;
+  console.log("Spicetify CLI not found — installing it (official installer)…");
+  const r = spawnSync(
+    "powershell",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+      "$ProgressPreference='SilentlyContinue'; iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex"],
+    { encoding: "utf8", windowsHide: true, timeout: 5 * 60 * 1000 }
+  );
+  process.stdout.write((r.stdout || "").slice(-1200));
+  if (r.stderr) process.stderr.write(r.stderr.slice(-600));
+  return resolveSpicetify();
+}
+
+let cli = resolveSpicetify();
+if (!cli && !process.argv.includes("--no-cli-install")) cli = installSpicetifyCli();
+if (!cli) {
   console.error(
-    "Spicetify CLI not found. Install it first (https://spicetify.app):\n" +
-      "  iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex\n" +
-      "then re-run this installer."
+    "Spicetify CLI could not be installed automatically. Install it manually from https://spicetify.app and run this again."
   );
   process.exit(1);
 }
-console.log(`Spicetify ${probe.stdout.trim()} found.`);
+console.log(`Spicetify ${cli.version} ready (${cli.bin}).`);
+
+function spicetify(args) {
+  // shell:true only for the bare PATH name; a resolved path is spawned directly.
+  return spawnSync(cli.bin, args, { shell: cli.bin === "spicetify", encoding: "utf8" });
+}
 
 const extDir =
   process.platform === "win32"

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { completeAuth } from "@core/spotifyAccount";
+import { completeAuth, recordAuthFailure } from "@core/spotifyAccount";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,12 +18,17 @@ export async function GET(req: NextRequest) {
 
   if (denied) {
     title = "Authorization cancelled";
+    // access_denied is ALSO what a Development-Mode app returns for an account
+    // that is not on its allowlist — say so, because "you declined" would be
+    // wrong and would send the user looking in the wrong place.
     detail = denied === "access_denied"
-      ? "You declined the authorization — nothing was connected."
+      ? "Spotify refused this account. Either you declined, or this Spotify app is still in Development Mode and your account is not on its allowlist — the app owner has to add it."
       : `Spotify reported: ${denied}`;
+    recordAuthFailure(denied, detail);
   } else {
     const out = await completeAuth(q.get("code"), q.get("state"));
     ok = out.ok;
+    if (!out.ok) recordAuthFailure(out.code, out.message);
     if (out.ok) {
       title = "Spotify account connected";
       detail = out.displayName
