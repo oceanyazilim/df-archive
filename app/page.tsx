@@ -6,7 +6,8 @@ import { TopNavigation } from "./components/layout/TopNavigation";
 import { MobileNavigation } from "./components/layout/MobileNavigation";
 import { PageContainer } from "./components/layout/PageContainer";
 import { NavigationTransitionProvider, useNavigationTransition } from "./components/providers/NavigationTransitionProvider";
-import { AdminProvider } from "./components/providers/AdminProvider";
+import { AdminProvider, useAdmin } from "./components/providers/AdminProvider";
+import { AdminLoginDialog } from "./components/shared/AdminLoginDialog";
 import { VIEW_TITLE } from "./components/layout/nav-config";
 import { FullscreenLoaderOverlay } from "./components/loaders/FullscreenLoaderOverlay";
 
@@ -78,6 +79,12 @@ function PageInner() {
   // `analyze` is defined below; the URL-restore effect needs it without
   // re-running whenever its identity changes.
   const analyzeRef = useRef<((input: string) => void) | null>(null);
+  // Artist analysis is admin-only. The ref keeps `analyze` (deps: []) reading
+  // the live value; the server enforces the same gate on the API.
+  const { isAdmin } = useAdmin();
+  const isAdminRef = useRef(false);
+  isAdminRef.current = isAdmin;
+  const [adminGate, setAdminGate] = useState(false);
 
   useEffect(() => {
     const f = () => jget<Health>("/api/health").then((h) => { setHealth(h); setLastHealthAt(Date.now()); setAppReady(true); }).catch(() => {});
@@ -143,7 +150,15 @@ function PageInner() {
       if (data.error) { const e = data.error as { code?: string; message: string }; setError({ code: e.code, message: e.message }); return; }
 
       // Artist link → the full catalogue view (a separate, heavier load).
+      // Admin-only: the catalogue exposes the full removed-release history.
       if (data.kind === "artist") {
+        if (!isAdminRef.current) {
+          setSession(null);
+          setArtist(null);
+          setError({ code: "ADMIN_ONLY", message: "Artist analysis is only available to the site admin. Sign in, then run the query again." });
+          setAdminGate(true);
+          return;
+        }
         const artistId = String(data.spotifyArtistId ?? "");
         setSession(null);
         setArtist({ loading: true, data: null, error: null, fetchedAt: null, artistId });
@@ -270,6 +285,7 @@ function PageInner() {
           </PageContainer>
         </div>
         {toast && <div className="toast anim-pop">{toast}</div>}
+        <AdminLoginDialog open={adminGate} onOpenChange={setAdminGate} />
       </div>
     </TooltipProvider>
     </MotionConfig>

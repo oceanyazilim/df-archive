@@ -16,7 +16,7 @@ import { TrackList } from "./TrackList";
 import { exportReleaseJson } from "./exportUtils";
 import type { AnalyzerTarget } from "../analyzer-details/OceanAnalyzerPage";
 
-const TYPE_LABEL: Record<string, string> = { album: "Album", single: "Single", compilation: "Compilation", appears_on: "Appears On" };
+const TYPE_LABEL: Record<string, string> = { album: "Album", single: "Single", compilation: "Compilation", appears_on: "Appears On", removed: "Removed" };
 
 export interface ReleaseDetailsDrawerProps {
   release: ReleaseRow | null;
@@ -45,7 +45,9 @@ export function ReleaseDetailsDrawer({ release, resolved, onClose, onOpenAnalyze
 
   const resolvedByTrackId = useMemo(() => {
     const map: Record<string, Resolved | undefined> = {};
-    if (release) for (const t of release.tracks) if (t.spotifyTrackId) map[t.spotifyTrackId] = resolved[t.key];
+    // Removed tracks have no Spotify id — their resolution (recovered
+    // ISRC/UPC/distributor) is keyed by the catalogue row key instead.
+    if (release) for (const t of release.tracks) map[t.spotifyTrackId ?? t.key] = resolved[t.key];
     return map;
   }, [release, resolved]);
 
@@ -81,7 +83,8 @@ export function ReleaseDetailsDrawer({ release, resolved, onClose, onOpenAnalyze
         trackNumber: t.trackNumber ?? i + 1,
         title: t.title,
         durationMs: t.durationMs,
-        isrc: t.isrc,
+        // Recovery may have brought the ISRC back for a removed track.
+        isrc: t.isrc ?? resolved[t.key]?.isrc ?? null,
         explicit: t.explicit ?? false,
       }));
 

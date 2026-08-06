@@ -33,7 +33,8 @@ export function TrackList({ tracks, resolvedByTrackId, onOpenTrack }: {
   return (
     <div className="divide-y divide-border-subtle">
       {tracks.map((t) => {
-        const r = t.spotifyTrackId ? resolvedByTrackId[t.spotifyTrackId] : undefined;
+        // Removed tracks resolve under their catalogue key (Soundcharts uuid).
+        const r = resolvedByTrackId[t.spotifyTrackId ?? t.key];
         return (
           <div key={t.key} className="flex items-center gap-2.5 py-2">
             <span className="w-5 shrink-0 text-right text-[11px] tabular-nums text-foreground-muted">{t.trackNumber}</span>

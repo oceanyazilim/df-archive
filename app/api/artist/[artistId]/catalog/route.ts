@@ -2,12 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildArtistCatalog } from "@core/artist/catalog";
 import { SoundchartsError } from "@core/soundcharts/errors";
 import { PoolUnavailableError } from "@core/credentialPool";
+import { ADMIN_COOKIE_NAME, isValidAdminSession } from "@core/adminStore";
 import { CONNECTOR_CORS, corsPreflight } from "../../../connector/cors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ARTIST_RE = /^[A-Za-z0-9]{22}$/;
+
+/** Artist catalogues are heavy (many provider calls) and expose the full
+ *  removed-release history — admin-only by request. */
+function requireAdmin(req: NextRequest): NextResponse | null {
+  const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  if (isValidAdminSession(token)) return null;
+  return NextResponse.json(
+    { error: { code: "ADMIN_ONLY", message: "Artist analysis is only available to the site admin. Sign in from the user menu." } },
+    { status: 403, headers: CONNECTOR_CORS }
+  );
+}
 
 export async function OPTIONS() { return corsPreflight(); }
 
@@ -21,6 +33,8 @@ export async function OPTIONS() { return corsPreflight(); }
  * are filled in progressively by the panel.
  */
 export async function GET(req: NextRequest, ctx: { params: { artistId: string } }) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
   const artistId = ctx.params.artistId;
   if (!ARTIST_RE.test(artistId)) {
     return NextResponse.json({ error: { code: "INVALID_LOOKUP_INPUT", message: "Invalid Spotify artist id." } }, { status: 400, headers: CONNECTOR_CORS });

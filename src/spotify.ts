@@ -181,6 +181,22 @@ export async function findAlbumIdByUpc(upc: string, cfg?: ResolverConfig, signal
   return typeof id === "string" && /^[A-Za-z0-9]{22}$/.test(id) ? id : null;
 }
 
+/**
+ * Find a track by ISRC via catalogue search. Returns the raw track object
+ * (id, name, album, external_ids) or null when the recording is not in
+ * Spotify's catalogue — the case for releases fully taken down.
+ */
+export async function findTrackByIsrc(isrc: string, cfg?: ResolverConfig, signal?: AbortSignal): Promise<Record<string, unknown> | null> {
+  const params: Record<string, string> = { q: `isrc:${isrc}`, type: "track", limit: "5" };
+  if (SPOTIFY.market) params.market = SPOTIFY.market;
+  const { status, body } = await getSpotifyResource("/search", "Spotify ISRC search", cfg ?? defaultResolverConfig(), signal, params);
+  if (status < 200 || status >= 300) return null;
+  const items = (body.tracks as { items?: Record<string, unknown>[] } | undefined)?.items;
+  const first = Array.isArray(items) ? items[0] : undefined;
+  const id = first?.id;
+  return typeof id === "string" && /^[A-Za-z0-9]{22}$/.test(id) ? first! : null;
+}
+
 /** Artist profile: name, followers, popularity, genres, images. No market param. */
 export function getSpotifyArtist(artistId: string, cfg: ResolverConfig, signal?: AbortSignal) {
   return getSpotifyResource(`/artists/${encodeURIComponent(artistId)}`, "Spotify artist lookup", cfg, signal);

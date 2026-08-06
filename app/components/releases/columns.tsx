@@ -16,7 +16,7 @@ const STATUS_META: Record<ReleaseRow["metadataStatus"], { label: string; tone: "
   unresolved: { label: "Unknown", tone: "neutral" },
 };
 
-const TYPE_LABEL: Record<string, string> = { album: "Album", single: "Single", compilation: "Compilation", appears_on: "Appears On" };
+const TYPE_LABEL: Record<string, string> = { album: "Album", single: "Single", compilation: "Compilation", appears_on: "Appears On", removed: "Removed" };
 
 const col = createColumnHelper<ReleaseRow>();
 
@@ -43,7 +43,10 @@ export function buildColumns(onOpen: (row: ReleaseRow) => void) {
     }),
     col.accessor("releaseType", {
       header: "Type",
-      cell: (ctx) => <span className="text-foreground-secondary">{TYPE_LABEL[ctx.getValue() ?? ""] ?? "Unknown"}</span>,
+      cell: (ctx) =>
+        ctx.getValue() === "removed"
+          ? <StatusBadge tone="danger">Removed</StatusBadge>
+          : <span className="text-foreground-secondary">{TYPE_LABEL[ctx.getValue() ?? ""] ?? "Unknown"}</span>,
     }),
     col.accessor("releaseDate", {
       header: "Release date",
