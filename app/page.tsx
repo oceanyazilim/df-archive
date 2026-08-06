@@ -19,12 +19,13 @@ import { ErrorState } from "./components/shared/ErrorState";
 import { SpotifyUrlInput } from "./components/analyzer/SpotifyUrlInput";
 import { LazyOcean3DLoader as Ocean3DLoader } from "./components/loaders/LazyOcean3DLoader";
 import { ArtistWorkspace } from "./components/dashboard/ArtistWorkspace";
+import { PlaylistWorkspace } from "./components/dashboard/PlaylistWorkspace";
 import { OceanAnalyzerPage, type AnalyzerTarget } from "./components/analyzer-details/OceanAnalyzerPage";
 import { parseMusicLookupInput } from "@core/validation/musicInput";
 import { describeError } from "./lib/errorMessages";
 import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
-import type { ArtistCatalogData } from "./components/ArtistCatalog";
+import type { ArtistCatalogData, PlaylistCatalogData } from "./components/ArtistCatalog";
 import { HistoryView } from "./components/views/HistoryView";
 import { ArtistsView, AlbumsView, TracksView } from "./components/views/catalog";
 import { DistributorDatabasePage } from "./components/distributor/DistributorDatabasePage";
@@ -69,6 +70,7 @@ function PageInner() {
   }, []);
   const [session, setSession] = useState<Session | null>(null);
   const [artist, setArtist] = useState<{ loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null>(null);
+  const [playlist, setPlaylist] = useState<{ loading: boolean; data: PlaylistCatalogData | null; error: string | null; fetchedAt: string | null; playlistId: string | null } | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<{ code?: string; message: string } | null>(null);
   const [analysisKind, setAnalysisKind] = useState<AnalysisKind>("release");
@@ -138,13 +140,37 @@ function PageInner() {
   const analyze = useCallback(async (input: string) => {
     setView("lookup");
     if (!input.trim()) return;
-    const kind: AnalysisKind = parseMusicLookupInput(input.trim()).type === "spotify_artist" ? "artist" : "release";
+    const parsed = parseMusicLookupInput(input.trim());
+    const kind: AnalysisKind = parsed.type === "spotify_artist" || parsed.type === "spotify_playlist" ? "artist" : "release";
     const seq = ANALYSIS_SEQUENCE[kind];
     setAnalysisKind(kind);
     setRunning(true); setError(null); setAnalysisStatus(seq[0]);
     let seqIdx = 0;
     const ticker = setInterval(() => { seqIdx = Math.min(seqIdx + 1, seq.length - 1); setAnalysisStatus(seq[seqIdx]); }, 420);
     try {
+      // Playlist link → the playlist catalogue view. Admin-only like artist
+      // analysis; no /api/lookup round-trip is needed.
+      if (parsed.type === "spotify_playlist") {
+        const playlistId = parsed.normalizedValue;
+        if (!isAdminRef.current) {
+          setSession(null); setArtist(null); setPlaylist(null);
+          setError({ code: "ADMIN_ONLY", message: "Playlist analysis is only available to the site admin. Sign in, then run the query again." });
+          setAdminGate(true);
+          return;
+        }
+        setSession(null); setArtist(null);
+        setPlaylist({ loading: true, data: null, error: null, fetchedAt: null, playlistId });
+        try {
+          const cat = await jget<{ catalog?: PlaylistCatalogData; fetchedAt?: string; error?: { message: string } }>(`/api/playlist/${playlistId}/catalog`);
+          if (!cat.catalog) throw new Error(cat.error?.message ?? "Playlist catalogue could not be built.");
+          setPlaylist({ loading: false, data: cat.catalog, error: null, fetchedAt: cat.fetchedAt ?? null, playlistId });
+          await flashSuccess(false);
+        } catch (e) {
+          setPlaylist({ loading: false, data: null, error: (e as Error).message, fetchedAt: null, playlistId });
+        }
+        return;
+      }
+
       const r = await fetch("/api/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: input.trim() }) });
       const data = (await r.json()) as Record<string, unknown>;
       if (data.error) { const e = data.error as { code?: string; message: string }; setError({ code: e.code, message: e.message }); return; }
@@ -155,12 +181,14 @@ function PageInner() {
         if (!isAdminRef.current) {
           setSession(null);
           setArtist(null);
+          setPlaylist(null);
           setError({ code: "ADMIN_ONLY", message: "Artist analysis is only available to the site admin. Sign in, then run the query again." });
           setAdminGate(true);
           return;
         }
         const artistId = String(data.spotifyArtistId ?? "");
         setSession(null);
+        setPlaylist(null);
         setArtist({ loading: true, data: null, error: null, fetchedAt: null, artistId });
         try {
           const cat = await jget<{ catalog?: ArtistCatalogData; fetchedAt?: string; error?: { message: string } }>(`/api/artist/${artistId}/catalog`);
@@ -177,12 +205,14 @@ function PageInner() {
         const release = data.release as AlbumRelease;
         if (!release.tracks.length) { setError({ message: "This release has no tracks." }); return; }
         setArtist(null);
+        setPlaylist(null);
         setSession({ release, initialTrackId: release.tracks[0].spotifyTrackId, seed: null });
         await flashSuccess(false);
         return;
       }
 
       setArtist(null);
+      setPlaylist(null);
       const ws = data as unknown as Workspace;
       if (ws.errors?.length && !ws.identity.soundchartsSongUuid && !ws.metadata.trackTitle) { setError({ code: ws.errors[0].code, message: ws.errors[0].message }); return; }
       const hadWarnings = !!ws.errors?.length;
@@ -264,7 +294,7 @@ function PageInner() {
             <div className="view-anim">
               {view === "lookup" && (
                 <LookupView
-                  session={session} artist={artist} running={running} analysisStatus={analysisStatus} analysisKind={analysisKind} error={error}
+                  session={session} artist={artist} playlist={playlist} running={running} analysisStatus={analysisStatus} analysisKind={analysisKind} error={error}
                   flash={flash} onAnalyze={analyze}
                   onOpenSettings={() => go("settings")} onOpenReports={() => go("reports")} onOpenHistory={() => go("history")}
                   onOpenAnalyzer={openAnalyzer}
@@ -315,13 +345,51 @@ function SpotifyCooldownBanner({ ms }: { ms: number }) {
 }
 
 /** The Dashboard view: landing hero (no session) or the release workspace. */
-function LookupView({ session, artist, running, analysisStatus, analysisKind, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, onOpenAnalyzer }: {
+function LookupView({ session, artist, playlist, running, analysisStatus, analysisKind, error, flash, onAnalyze, onOpenSettings, onOpenReports, onOpenHistory, onOpenAnalyzer }: {
   session: Session | null;
   artist: { loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null;
+  playlist: { loading: boolean; data: PlaylistCatalogData | null; error: string | null; fetchedAt: string | null; playlistId: string | null } | null;
   running: boolean; analysisStatus: AnalysisStatus; analysisKind: AnalysisKind; error: { code?: string; message: string } | null;
   flash: (m: string) => void; onAnalyze: (input: string) => void; onOpenSettings: () => void;
   onOpenReports: () => void; onOpenHistory: () => void; onOpenAnalyzer: (target: AnalyzerTarget) => void;
 }) {
+  // Playlist catalogue takes over the view when a playlist link was analyzed.
+  if (playlist) {
+    if (playlist.loading) {
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
+          </div>
+          <Skeleton className="h-72 w-full" />
+        </div>
+      );
+    }
+    if (playlist.error || !playlist.data) {
+      return (
+        <ErrorState
+          title="Playlist catalogue unavailable"
+          message={playlist.error ?? "The playlist could not be read."}
+          onRetry={playlist.playlistId ? () => onAnalyze(`https://open.spotify.com/playlist/${playlist.playlistId}`) : undefined}
+          className="mx-auto mt-10 max-w-lg"
+        />
+      );
+    }
+    return (
+      <motion.div key={playlist.data.spotifyUrl} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4, ease: [0.22, 0.8, 0.36, 1] }}>
+        <PlaylistWorkspace
+          data={playlist.data}
+          fetchedAt={playlist.fetchedAt}
+          onReanalyze={() => onAnalyze(playlist.data!.spotifyUrl)}
+          onOpenAnalyzer={onOpenAnalyzer}
+          onAnalyze={onAnalyze}
+          flash={flash}
+        />
+      </motion.div>
+    );
+  }
+
   // Artist catalogue takes over the view when an artist link was analyzed.
   if (artist) {
     if (artist.loading) {
@@ -378,7 +446,7 @@ function LookupView({ session, artist, running, analysisStatus, analysisKind, er
           })()}
           {!running && (
             <p className="mt-2 text-center text-[11.5px] text-foreground-muted">
-              Supported: Spotify track / album / artist URL · Spotify URI · ISRC · UPC · Soundcharts song UUID
+              Supported: Spotify track / album / artist / playlist URL · Spotify URI · ISRC · UPC · Soundcharts song UUID
             </p>
           )}
         </div>

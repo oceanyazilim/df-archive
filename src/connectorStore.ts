@@ -229,6 +229,99 @@ export function bridgeCommandState() {
   };
 }
 
+// ---------------- Desktop playlist fetch queue ----------------
+// Spotify's client-credentials tokens stopped returning playlist TRACKS
+// entirely (measured 2026-08: the playlist response no longer even has a
+// `tracks` field, and /playlists/{id}/tracks was already 403). The user's own
+// Spotify client still sees every playlist, so the panel queues a fetch here
+// and the desktop shell answers it through the CDP bridge — same trust model
+// as pending track lookups.
+const PLAYLIST_FETCH_TTL_MS = 45 * 1000;
+
+export type PlaylistFetch = {
+  requestId: string;
+  playlistId: string;
+  createdAt: number;
+  expiresAt: number;
+  status: "pending" | "completed" | "failed";
+  /** Slim track items exactly as the bridge returned them (plain JSON). */
+  items: unknown[] | null;
+  total: number | null;
+  playlistName: string | null;
+  /** True when the client's internal API served the list (no ISRC per item). */
+  viaPlatform: boolean;
+  error: string | null;
+};
+const playlistFetches = new Map<string, PlaylistFetch>();
+
+function sweepPlaylistFetches(): void {
+  const t = now();
+  for (const [id, f] of playlistFetches) {
+    if (f.status === "pending" && f.expiresAt <= t) { f.status = "failed"; f.error = "The desktop app did not answer in time."; }
+    if (t - f.createdAt > 5 * 60 * 1000) playlistFetches.delete(id);
+  }
+}
+
+/** Panel-side: queue a playlist fetch (reuses an identical in-flight one). */
+export function createPlaylistFetch(playlistId: string): PlaylistFetch {
+  sweepPlaylistFetches();
+  for (const f of playlistFetches.values()) {
+    if (f.playlistId === playlistId && f.status === "pending") return f;
+  }
+  const f: PlaylistFetch = {
+    requestId: token(12),
+    playlistId,
+    createdAt: now(),
+    expiresAt: now() + PLAYLIST_FETCH_TTL_MS,
+    status: "pending",
+    items: null,
+    total: null,
+    playlistName: null,
+    viaPlatform: false,
+    error: null,
+  };
+  playlistFetches.set(f.requestId, f);
+  return f;
+}
+
+/** Desktop-side (authorized): the oldest pending fetch, if any. Not consumed
+ *  until completed, so a shell restart cannot lose the request. */
+export function pendingPlaylistFetch(): { requestId: string; playlistId: string } | null {
+  sweepPlaylistFetches();
+  let oldest: PlaylistFetch | null = null;
+  for (const f of playlistFetches.values()) {
+    if (f.status !== "pending") continue;
+    if (!oldest || f.createdAt < oldest.createdAt) oldest = f;
+  }
+  return oldest ? { requestId: oldest.requestId, playlistId: oldest.playlistId } : null;
+}
+
+/** Desktop-side (authorized): deliver the result (or the failure). */
+export function completePlaylistFetch(
+  requestId: unknown,
+  payload: { items?: unknown; total?: unknown; playlistName?: unknown; viaPlatform?: unknown; error?: unknown }
+): boolean {
+  if (typeof requestId !== "string") return false;
+  const f = playlistFetches.get(requestId);
+  if (!f || f.status !== "pending") return false;
+  if (Array.isArray(payload.items)) {
+    f.items = payload.items.slice(0, 1200);
+    f.total = typeof payload.total === "number" && Number.isFinite(payload.total) ? payload.total : f.items.length;
+    f.playlistName = typeof payload.playlistName === "string" ? payload.playlistName.slice(0, 300) : null;
+    f.viaPlatform = payload.viaPlatform === true;
+    f.status = "completed";
+  } else {
+    f.status = "failed";
+    f.error = typeof payload.error === "string" ? payload.error.slice(0, 300) : "The Spotify client could not read this playlist.";
+  }
+  return true;
+}
+
+export function getPlaylistFetch(requestId: string): PlaylistFetch | null {
+  sweepPlaylistFetches();
+  return playlistFetches.get(requestId) ?? null;
+}
+
 export function connectorStatus() {
   ensureLoaded();
   sweep();
@@ -393,6 +486,7 @@ export function __resetConnectorStore(): void {
   lookups.clear();
   dedup.clear();
   rate.clear();
+  playlistFetches.clear();
   lastHeartbeatAt = null;
   extensionIdSeen = null;
   bridgeStatus = null;

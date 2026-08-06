@@ -11,7 +11,7 @@
 import { extractSpotifyTrackId } from "../spotifyMetadata";
 
 export type MusicInputType =
-  | "spotify_track" | "spotify_album" | "spotify_artist"
+  | "spotify_track" | "spotify_album" | "spotify_artist" | "spotify_playlist"
   | "isrc" | "upc" | "soundcharts_song_uuid" | "invalid";
 export type ParsedMusicInput = {
   type: MusicInputType;
@@ -42,6 +42,23 @@ export function extractSpotifyAlbumId(input: unknown): string | null {
       const url = new URL(v);
       if (!/(^|\.)spotify\.com$/i.test(url.hostname)) return null;
       const m = url.pathname.match(/\/album\/([A-Za-z0-9]{22})(?:\/|$)/);
+      return m ? m[1] : null;
+    } catch { return null; }
+  }
+  return null;
+}
+
+/** Extract a Spotify PLAYLIST id from a URL/URI. Query params + intl paths handled. */
+export function extractSpotifyPlaylistId(input: unknown): string | null {
+  if (input === null || input === undefined) return null;
+  const v = String(input).trim();
+  const uri = v.match(/^spotify:playlist:([A-Za-z0-9]{22})$/);
+  if (uri) return uri[1];
+  if (/^https?:\/\//i.test(v)) {
+    try {
+      const url = new URL(v);
+      if (!/(^|\.)spotify\.com$/i.test(url.hostname)) return null;
+      const m = url.pathname.match(/\/playlist\/([A-Za-z0-9]{22})(?:\/|$)/);
       return m ? m[1] : null;
     } catch { return null; }
   }
@@ -79,10 +96,14 @@ export function parseMusicLookupInput(input: unknown): ParsedMusicInput {
   const artistId = extractSpotifyArtistId(raw);
   if (artistId) return { type: "spotify_artist", normalizedValue: artistId, originalValue: raw };
 
+  // Spotify PLAYLIST (URL / URI) — opens the playlist catalog view (admin-only).
+  const playlistId = extractSpotifyPlaylistId(raw);
+  if (playlistId) return { type: "spotify_playlist", normalizedValue: playlistId, originalValue: raw };
+
   // Reject the resource types we genuinely cannot analyze.
-  if (/^spotify:(playlist|episode|show|user):/i.test(raw)) return invalid(raw, "Supported: Spotify track, album or artist.");
-  if (/^https?:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|episode|show)\//i.test(raw)) {
-    return invalid(raw, "Supported: Spotify track, album or artist.");
+  if (/^spotify:(episode|show|user):/i.test(raw)) return invalid(raw, "Supported: Spotify track, album, artist or playlist.");
+  if (/^https?:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(episode|show)\//i.test(raw)) {
+    return invalid(raw, "Supported: Spotify track, album, artist or playlist.");
   }
 
   // Spotify track (URL / URI / bare id) — handles localized paths + ?si=.

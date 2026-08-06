@@ -26,6 +26,16 @@ export type CatalogTrack = {
   source: "spotify" | "soundcharts";
 };
 
+/** Playlist catalogue — same track contract, playlist-shaped header fields. */
+export type PlaylistCatalogData = Omit<ArtistCatalogData, "spotifyArtistId" | "soundchartsArtistUuid"> & {
+  kind: "playlist_catalog";
+  spotifyPlaylistId: string;
+  owner: string | null;
+  followers: number | null;
+  totalTracks: number | null;
+  trackSource: "spotify_account" | "spotify_client" | null;
+};
+
 export type ArtistCatalogData = {
   spotifyArtistId: string;
   name: string | null;

@@ -18,13 +18,13 @@
  */
 
 import { defaultResolverConfig } from "../config";
-import { findTrackByIsrc, getSpotifyAlbum } from "../spotify";
+import { findTrackByIsrc, getSpotifyAlbum, getSpotifyTrack } from "../spotify";
 import { isSoundchartsConfigured } from "../soundcharts/config";
-import { getSongMetadata, getSongIdentifiers, getSongAlbums } from "../soundcharts/song";
+import { getSongMetadata, getSongIdentifiers, getSongAlbums, getSongBySpotifyId } from "../soundcharts/song";
 import { logger } from "../logger";
 
 export type RecoveredTrack = {
-  soundchartsSongUuid: string;
+  soundchartsSongUuid: string | null;
   spotifyTrackId: string | null;
   spotifyAlbumId: string | null;
   isrc: string | null;
@@ -46,12 +46,32 @@ function spotifyIdFromIdentifier(identifier: string | null, url: string | null):
   return m ? m[1] : null;
 }
 
-export async function recoverRemovedTrack(songUuid: string, knownIsrc?: string | null): Promise<RecoveredTrack> {
-  if (!isSoundchartsConfigured()) throw new Error("Analytics are not configured on the server.");
+/**
+ * Entry points: an artist-catalogue removed row arrives with a Soundcharts
+ * uuid; a playlist removed row arrives with the (delisted) Spotify track id.
+ * Either one is enough — the missing one is resolved from the other.
+ */
+export async function recoverRemovedTrack(
+  songUuidIn: string | null,
+  knownIsrc?: string | null,
+  spotifyTrackIdIn?: string | null
+): Promise<RecoveredTrack> {
+  let songUuid = songUuidIn;
+  const inputSpotifyId = spotifyTrackIdIn && SPOTIFY_ID_RE.test(spotifyTrackIdIn) ? spotifyTrackIdIn : null;
+  if (!songUuid && !inputSpotifyId) throw new Error("A Soundcharts uuid or a Spotify track id is required.");
 
+  // Bridge a Spotify-id-only request into the Soundcharts chain — Soundcharts
+  // keeps delisted recordings that Spotify's own API may no longer serve.
+  if (!songUuid && inputSpotifyId && isSoundchartsConfigured()) {
+    try {
+      const song = await getSongBySpotifyId(inputSpotifyId);
+      const uuid = str(song?.uuid);
+      if (uuid) songUuid = uuid;
+    } catch { /* proceed with Spotify-only recovery */ }
+  }
   const out: RecoveredTrack = {
     soundchartsSongUuid: songUuid,
-    spotifyTrackId: null,
+    spotifyTrackId: inputSpotifyId,
     spotifyAlbumId: null,
     isrc: null,
     upc: null,
@@ -61,52 +81,75 @@ export async function recoverRemovedTrack(songUuid: string, knownIsrc?: string |
     sources: [],
   };
 
-  // The three Soundcharts reads are independent but run SEQUENTIALLY: firing
-  // them together trips Soundcharts' per-account rate limit and parks pool
-  // slots for nothing (observed: 3 parallel calls → 3 slots cooling down).
+  // The Soundcharts reads are independent but run SEQUENTIALLY: firing them
+  // together trips Soundcharts' per-account rate limit and parks pool slots
+  // for nothing (observed: 3 parallel calls → 3 slots cooling down).
   // Individual failures are tolerated — a song with no album entry is normal.
-  const settle = async <T>(p: Promise<T>): Promise<PromiseSettledResult<T>> =>
-    p.then((value) => ({ status: "fulfilled" as const, value })).catch((reason) => ({ status: "rejected" as const, reason }));
-  const meta = await settle(getSongMetadata(songUuid));
-  const ids = await settle(getSongIdentifiers(songUuid));
-  const albums = await settle(getSongAlbums(songUuid));
+  if (songUuid && isSoundchartsConfigured()) {
+    const settle = async <T>(p: Promise<T>): Promise<PromiseSettledResult<T>> =>
+      p.then((value) => ({ status: "fulfilled" as const, value })).catch((reason) => ({ status: "rejected" as const, reason }));
+    const meta = await settle(getSongMetadata(songUuid));
+    const ids = await settle(getSongIdentifiers(songUuid));
+    const albums = await settle(getSongAlbums(songUuid));
 
-  if (meta.status === "fulfilled" && meta.value) {
-    out.isrc = str(meta.value.isrc)?.toUpperCase() ?? null;
-    out.label = str(meta.value.label);
-    out.releaseDate = str(meta.value.releaseDate);
-    if (out.isrc || out.label) out.sources.push("soundcharts_metadata");
+    if (meta.status === "fulfilled" && meta.value) {
+      out.isrc = str(meta.value.isrc)?.toUpperCase() ?? null;
+      out.label = str(meta.value.label);
+      out.releaseDate = str(meta.value.releaseDate);
+      if (out.isrc || out.label) out.sources.push("soundcharts_metadata");
+    }
+    if (ids.status === "fulfilled") {
+      for (const id of ids.value) {
+        const code = (str(id.platformCode) ?? str(id.platformName) ?? "").toLowerCase();
+        if (code !== "spotify") continue;
+        const recovered = spotifyIdFromIdentifier(str(id.identifier), str(id.url));
+        if (recovered) { out.spotifyTrackId = out.spotifyTrackId ?? recovered; out.sources.push("soundcharts_identifiers"); break; }
+      }
+    }
+    if (albums.status === "fulfilled") {
+      // Prefer the album entry that actually carries a barcode.
+      const withUpc = albums.value.find((a) => str(a.upc)) ?? albums.value[0];
+      if (withUpc) {
+        out.upc = str(withUpc.upc);
+        out.albumTitle = str(withUpc.name);
+        out.label = out.label ?? str(withUpc.label);
+        out.releaseDate = out.releaseDate ?? str(withUpc.releaseDate);
+        if (out.upc || out.albumTitle) out.sources.push("soundcharts_albums");
+      }
+    }
   }
-  // The artist-catalogue history often already carries the ISRC — use it when
-  // the metadata read failed (rate limit) or came back without one, so the
-  // Spotify search below still has something to work with.
+
+  // The catalogue often already carries the ISRC — use it when the metadata
+  // read failed (rate limit) or came back without one, so the Spotify steps
+  // below still have something to work with.
   if (!out.isrc && str(knownIsrc)) {
     out.isrc = str(knownIsrc)!.toUpperCase();
     out.sources.push("catalog_history");
   }
-  if (ids.status === "fulfilled") {
-    for (const id of ids.value) {
-      const code = (str(id.platformCode) ?? str(id.platformName) ?? "").toLowerCase();
-      if (code !== "spotify") continue;
-      const recovered = spotifyIdFromIdentifier(str(id.identifier), str(id.url));
-      if (recovered) { out.spotifyTrackId = recovered; out.sources.push("soundcharts_identifiers"); break; }
-    }
-  }
-  if (albums.status === "fulfilled") {
-    // Prefer the album entry that actually carries a barcode.
-    const withUpc = albums.value.find((a) => str(a.upc)) ?? albums.value[0];
-    if (withUpc) {
-      out.upc = str(withUpc.upc);
-      out.albumTitle = str(withUpc.name);
-      out.label = out.label ?? str(withUpc.label);
-      out.releaseDate = out.releaseDate ?? str(withUpc.releaseDate);
-      if (out.upc || out.albumTitle) out.sources.push("soundcharts_albums");
-    }
+
+  const cfg = defaultResolverConfig();
+
+  // Direct track read: a delisted track's metadata often still resolves on
+  // the API even though it is no longer playable — cheapest ISRC/album source
+  // when the request came in with a Spotify id.
+  if (inputSpotifyId && (!out.isrc || !out.spotifyAlbumId)) {
+    try {
+      const { status, body } = await getSpotifyTrack(inputSpotifyId, cfg);
+      if (status >= 200 && status < 300) {
+        const t = body as Record<string, unknown>;
+        const alb = (t.album as Record<string, unknown>) ?? {};
+        out.isrc = out.isrc ?? (str((t.external_ids as Record<string, unknown> | undefined)?.isrc)?.toUpperCase() ?? null);
+        const albumId = str(alb.id);
+        out.spotifyAlbumId = out.spotifyAlbumId ?? (albumId && SPOTIFY_ID_RE.test(albumId) ? albumId : null);
+        out.albumTitle = out.albumTitle ?? str(alb.name);
+        out.releaseDate = out.releaseDate ?? str(alb.release_date);
+        out.sources.push("spotify_track");
+      }
+    } catch { /* the track may be fully gone — later steps still apply */ }
   }
 
   // Spotify fallback/confirmation: an ISRC search finds the recording even
   // when it was re-released under a different track id.
-  const cfg = defaultResolverConfig();
   if (!out.spotifyTrackId && out.isrc) {
     try {
       const track = await findTrackByIsrc(out.isrc, cfg);

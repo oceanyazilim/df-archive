@@ -288,6 +288,38 @@ async function pumpAnalyzer() {
   await bridge.writeAnalyzerResponse(req.id, payload).catch(() => {});
 }
 
+/**
+ * Answer one queued playlist fetch by reading the tracks through the user's
+ * own Spotify client (app tokens no longer receive playlist tracks at all).
+ * One at a time — a playlist read is many renderer fetches.
+ */
+const playlistFetchesInFlight = new Set();
+async function answerPlaylistFetch(reqInfo) {
+  const requestId = String(reqInfo?.requestId ?? "");
+  const playlistId = String(reqInfo?.playlistId ?? "");
+  if (!requestId || playlistFetchesInFlight.size > 0 || playlistFetchesInFlight.has(requestId)) return;
+  playlistFetchesInFlight.add(requestId);
+  try {
+    const r = await bridge.fetchPlaylistTracks(playlistId);
+    await api("POST", "/api/connector/playlist-tracks", {
+      requestId,
+      items: r.items,
+      total: r.total,
+      playlistName: r.playlistName,
+      viaPlatform: !!r.viaPlatform,
+    });
+    console.log("[bridge] playlist answered:", playlistId, `(${r.items.length} tracks)`);
+  } catch (e) {
+    await api("POST", "/api/connector/playlist-tracks", {
+      requestId,
+      error: e?.message || "The Spotify client could not read this playlist.",
+    }).catch(() => {});
+    console.warn("[bridge] playlist fetch failed for", playlistId, "-", e?.message || e);
+  } finally {
+    playlistFetchesInFlight.delete(requestId);
+  }
+}
+
 let reconnecting = false;
 let brokenLinkBeats = 0;
 let lastAutoReconnectAt = 0;
@@ -323,6 +355,7 @@ function startBridgeLoops() {
     try {
       const out = await api("GET", "/api/connector/pending");
       for (const id of out?.pendingTrackIds ?? []) answerPending(id);
+      if (out?.playlistFetch) answerPlaylistFetch(out.playlistFetch);
     } catch { /* transient; next tick retries */ }
   };
   const beat = async () => {

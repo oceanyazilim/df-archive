@@ -574,7 +574,10 @@ async function main(): Promise<void> {
   eq(parseMusicLookupInput("USUM71703861").type, "isrc", "isrc still parses");
   eq(parseMusicLookupInput("2c9d1a12-a9d9-4564-aa51-046bb057677b").type, "soundcharts_song_uuid", "soundcharts uuid still parses");
   eq(parseMusicLookupInput("https://open.spotify.com/artist/0oSGxfWSnnOXhD2fKuz2Gy").type, "spotify_artist", "artist url -> artist catalogue");
-  eq(parseMusicLookupInput("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M").type, "invalid", "playlist url -> invalid");
+  eq(parseMusicLookupInput("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M").type, "spotify_playlist", "playlist url -> playlist catalogue");
+  eq(parseMusicLookupInput("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M").normalizedValue, "37i9dQZF1DXcBWIGoYBM5M", "playlist id extracted");
+  eq(parseMusicLookupInput("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M").type, "spotify_playlist", "playlist uri -> playlist catalogue");
+  eq(parseMusicLookupInput("https://open.spotify.com/episode/0000000000000000000000").type, "invalid", "episode url stays rejected");
   eq(extractSpotifyAlbumId("spotify:album:4aawyAB9vmqN3uQ7FjRGTy"), "4aawyAB9vmqN3uQ7FjRGTy", "extractSpotifyAlbumId uri");
   eq(extractSpotifyAlbumId("https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy"), "4aawyAB9vmqN3uQ7FjRGTy", "extractSpotifyAlbumId url");
   eq(extractSpotifyAlbumId("https://open.spotify.com/track/5MH8rf9BdkrFlBEeaYkFZ3"), null, "extractSpotifyAlbumId rejects track url");
@@ -1082,7 +1085,7 @@ async function main(): Promise<void> {
   eq(parseMusicLookupInput("4099964272932").type, "upc", "13-digit barcode parses as a UPC");
   eq(parseMusicLookupInput("GBARL9300135").type, "isrc", "ISRC still parses as an ISRC, not a UPC");
   eq(parseMusicLookupInput("https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy").type, "spotify_album", "album URL still parses");
-  eq(parseMusicLookupInput("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M").type, "invalid", "playlist URL is still rejected");
+  eq(parseMusicLookupInput("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M").type, "spotify_playlist", "playlist URL parses as a playlist");
   eq(parseMusicLookupInput("12345678901").type, "invalid", "an 11-digit number is not a UPC");
 
   const catalogSrc = read("src/artist/catalog.ts");

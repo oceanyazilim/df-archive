@@ -90,15 +90,23 @@ export function useArtistCatalog(data: ArtistCatalogData) {
         if (!current) return;
         setResolved((p) => ({ ...p, [current.key]: { status: "running", distributor: null, licensorUuid: null, isrc: current.isrc } }));
 
-        // Removed track: recover identifiers before (maybe) resolving.
+        // Removed track: recover identifiers before (maybe) resolving. Artist
+        // rows arrive with a Soundcharts uuid and no Spotify id; playlist rows
+        // arrive removed WITH their (delisted) Spotify id — both recover.
         let spotifyId = current.spotifyTrackId;
         let recovered: RecoveredTrackPayload["track"] | null = null;
-        if (!spotifyId && current.soundchartsSongUuid) {
+        const needsRecovery =
+          (!spotifyId && !!current.soundchartsSongUuid) ||
+          (!current.onProfile && (!current.isrc || !current.upc) && (!!current.soundchartsSongUuid || !!spotifyId));
+        if (needsRecovery) {
           try {
-            const isrcParam = current.isrc ? `&isrc=${encodeURIComponent(current.isrc)}` : "";
-            const r = await jget<RecoveredTrackPayload>(`/api/artist/recover-track?songUuid=${encodeURIComponent(current.soundchartsSongUuid)}${isrcParam}`);
+            const q = new URLSearchParams();
+            if (current.soundchartsSongUuid) q.set("songUuid", current.soundchartsSongUuid);
+            if (spotifyId) q.set("spotifyTrackId", spotifyId);
+            if (current.isrc) q.set("isrc", current.isrc);
+            const r = await jget<RecoveredTrackPayload>(`/api/artist/recover-track?${q.toString()}`);
             recovered = r.track ?? null;
-            spotifyId = recovered?.spotifyTrackId ?? null;
+            spotifyId = spotifyId ?? recovered?.spotifyTrackId ?? null;
           } catch { /* recovery is best-effort; reported below */ }
         }
 
