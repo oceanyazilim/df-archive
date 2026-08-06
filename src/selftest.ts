@@ -631,16 +631,16 @@ async function main(): Promise<void> {
   const globals = read("app/globals.css");
   const pageSrc = read("app/page.tsx");
   // 1) BrandLogo is the ONLY file importing the static logo PNG (no duplicate imports).
-  // The redesign replaced the theme-paired virus logos with a single static
-  // Ocean-Logo.png brand mark (no light/dark switching — this app is dark-only).
-  assert(/Ocean-Logo\.png/.test(brandLogo), "BrandLogo imports the Ocean logo PNG");
-  assert(!/Ocean-Logo\.png/.test(pageSrc), "page.tsx does NOT import the logo PNG directly");
+  // The Virus Records rebrand replaced Ocean-Logo.png with the single static
+  // white-virus-logo.png mark (no light/dark switching — this app is dark-only).
+  assert(/white-virus-logo\.png/.test(brandLogo), "BrandLogo imports the Virus Records logo PNG");
+  assert(!/white-virus-logo\.png/.test(pageSrc), "page.tsx does NOT import the logo PNG directly");
   for (const f of fs.readdirSync("app/components").filter((n) => n.endsWith(".tsx") && n !== "BrandLogo.tsx")) {
-    assert(!/Ocean-Logo\.png/.test(read(`app/components/${f}`)), `${f} does NOT import the logo PNG directly`);
+    assert(!/white-virus-logo\.png/.test(read(`app/components/${f}`)), `${f} does NOT import the logo PNG directly`);
   }
   // 2) EXACTLY ONE <img> is rendered — image only, no wordmark/text recreation.
   eq((brandLogo.match(/<img\s/g) || []).length, 1, "BrandLogo renders exactly one <img> element");
-  assert(!/Ocean Distro Finder<\/span>|<span[\s\S]{0,80}Ocean Distro Finder/.test(brandLogo), "logo is image-only — no recreated wordmark text inside BrandLogo");
+  assert(!/Virus Records<\/span>|<span[\s\S]{0,80}Virus Records/.test(brandLogo), "logo is image-only — no recreated wordmark text inside BrandLogo");
   assert(!/logo-for-dark|logo-for-light/.test(brandLogo) && !/logo-for-dark|logo-for-light/.test(globals), "no two-image CSS toggle remains");
   assert(!/filter:\s*invert|filter:\s*brightness|filter:\s*hue/.test(brandLogo) && !/\.brand[\s\S]{0,200}filter:\s*invert/.test(globals), "no permanent CSS-filter recoloring of the logo (a hover-only brightness lift is fine)");
   assert(/object-contain/.test(brandLogo) || /object-fit:\s*contain/.test(globals), "logo uses object-contain");

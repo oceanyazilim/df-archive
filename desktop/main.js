@@ -82,7 +82,7 @@ function forkServer() {
       // the device id inside it is what the panel counts as "this computer".
       DISTRO_LICENSE_PATH:
         process.env.DISTRO_LICENSE_PATH || path.join(app.getPath("userData"), "license.json"),
-      OCEAN_LICENSE_SERVER: process.env.OCEAN_LICENSE_SERVER || "https://virusrecords.net",
+      OCEAN_LICENSE_SERVER: process.env.OCEAN_LICENSE_SERVER || "https://distro.virusrecord.com",
       OCEAN_APP_VERSION: app.getVersion(),
     },
     stdio: "pipe",

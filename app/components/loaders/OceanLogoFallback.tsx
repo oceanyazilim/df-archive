@@ -1,4 +1,4 @@
-import oceanLogo from "../../../src/assets/Ocean-Logo.png";
+import virusLogo from "../../../src/assets/white-virus-logo.png";
 import { cn } from "../../lib/cn";
 
 /**
@@ -12,8 +12,8 @@ export function OceanLogoFallback({ size = 96, className }: { size?: number; cla
     <div className={cn("flex items-center justify-center", className)} style={{ width: size, height: size }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={oceanLogo.src}
-        alt="Ocean Distro Finder"
+        src={virusLogo.src}
+        alt="Virus Records"
         style={{ height: size * 0.62, width: "auto" }}
         className="animate-loader-pulse object-contain motion-reduce:animate-none"
       />

@@ -1,7 +1,7 @@
-import oceanLogo from "../../src/assets/Ocean-Logo.png";
+import virusLogo from "../../src/assets/white-virus-logo.png";
 
 /**
- * The static Ocean Distro Finder brand mark — the ONLY component that imports
+ * The static Virus Records brand mark — the ONLY component that imports
  * the logo image file. Renders exactly one <img>, image only, never
  * recreated with text/CSS, never recolored or filtered. A very subtle hover
  * brightness lift is the only permanent effect (no glow, no rotation).
@@ -23,8 +23,8 @@ export function BrandLogo({ variant = "sidebar", height, className }: { variant?
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={oceanLogo.src}
-      alt="Ocean Distro Finder"
+      src={virusLogo.src}
+      alt="Virus Records"
       style={{ height: h, width: "auto" }}
       className={`block object-contain transition-[filter] duration-fast ease-out hover:brightness-110 ${className ?? ""}`}
     />

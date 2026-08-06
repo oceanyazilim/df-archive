@@ -1,7 +1,7 @@
 # Dokploy: point the application at this compose file (or just the Dockerfile
 # and set the same environment + volume in the UI).
 #
-# The domain (virusrecords.net) is attached by Dokploy's proxy — no ports need
+# The domain (distro.virusrecord.com) is attached by Dokploy's proxy — no ports need
 # to be published manually when it manages routing.
 
 services:

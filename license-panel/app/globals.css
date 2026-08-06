@@ -3,30 +3,42 @@
 @tailwind utilities;
 
 /* ---- Virus Records design tokens ----
-   Distinct from the Ocean panel's blue: near-black surfaces, acid-lime accent,
-   violet for secondary emphasis. Components never hardcode a color. */
+   The same token set the desktop app uses, so the panel and the app read as
+   one product: solid charcoal surfaces on black, thin low-opacity borders,
+   acid-lime accent with a violet counterpart. Components never hardcode a
+   color. There is no light mode. */
 :root {
-  --background: #07080A;
+  --background: #000000;
+  --sidebar: #000000;
+  --header: rgba(0, 0, 0, 0.88);
   --surface: #101319;
   --surface-raised: #151921;
   --surface-hover: #191E27;
   --input-bg: #0B0E13;
-  --border: rgba(255, 255, 255, 0.11);
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --text-primary: #F4F6F8;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --text-primary: #FFFFFF;
   --text-secondary: #98A1AE;
   --text-muted: #626B78;
   --accent: #9CF04A;
   --accent-hover: #B4FF6B;
-  --accent-dim: rgba(156, 240, 74, 0.12);
+  --accent-deep: #4C8F1C;
   --accent-violet: #A98BFF;
+  --accent-dim: rgba(156, 240, 74, 0.12);
   --success: #4ADE80;
   --warning: #F5B94C;
   --danger: #FF6B7E;
   --on-accent: #0A1503;
+  --focus-ring: rgba(156, 240, 74, 0.26);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
   --radius: 10px;
   --radius-sm: 7px;
-  --radius-lg: 16px;
+  --radius-lg: 14px;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --ease-out: cubic-bezier(0.22, 0.8, 0.36, 1);
+  --sidebar-width: 248px;
 }
 
 * { box-sizing: border-box; }
@@ -37,6 +49,7 @@ html, body {
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.55;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 button { font-family: inherit; cursor: pointer; }
@@ -52,28 +65,24 @@ input, select, textarea {
   font: inherit;
   outline: none;
   width: 100%;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
 }
 input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
-input::placeholder { color: var(--text-muted); }
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+select option { background: var(--surface-raised); }
 
-/* The virus mark: a lime ring with a dark core, drawn in CSS so the panel
-   ships without image assets. */
-.vr-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: radial-gradient(circle at 30% 25%, var(--accent), #4C8F1C 78%);
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 12px;
-  color: var(--on-accent);
-  letter-spacing: -0.02em;
-  box-shadow: 0 0 0 1px rgba(156, 240, 74, 0.25), 0 6px 20px rgba(156, 240, 74, 0.12);
+/* Entrance used by page sections — one shared, subtle rise. */
+@keyframes vr-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.anim-in { animation: vr-in 260ms var(--ease-out) both; }
+.anim-in-1 { animation-delay: 40ms; }
+.anim-in-2 { animation-delay: 80ms; }
+.anim-in-3 { animation-delay: 120ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-in { animation: none; }
 }
 
 .scrollbar-thin::-webkit-scrollbar { width: 9px; height: 9px; }

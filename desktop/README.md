@@ -32,7 +32,7 @@ the app reads from Spotify instead of Spotify pushing to the app.
 ## Licensing (Virus Records key system)
 
 The app refuses to work until a key issued from the panel at
-**virusrecords.net** activates it (`license-panel/` in this repo — deploy that
+**distro.virusrecord.com** activates it (`license-panel/` in this repo — deploy that
 first). Two layers enforce it:
 
 - **UI** — `LicenseGate` in `app/page.tsx` shows the activation screen instead
@@ -58,7 +58,7 @@ Behaviour worth remembering:
 - **7-day offline grace**: an unreachable panel never locks a paying user out;
   only a definitive refusal (revoked / expired / blocked) locks immediately.
 - Override the panel URL with `OCEAN_LICENSE_SERVER` (defaults to
-  `https://virusrecords.net`) — this is how you test against a local panel:
+  `https://distro.virusrecord.com`) — this is how you test against a local panel:
 
   ```powershell
   $env:OCEAN_LICENSE_SERVER="http://127.0.0.1:4000"; npm start

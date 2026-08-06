@@ -30,7 +30,7 @@ const LICENSE_PATH =
 
 /** Where keys are issued and validated. Overridable for testing. */
 export function licenseServer(): string {
-  return (process.env.OCEAN_LICENSE_SERVER ?? "https://virusrecords.net").replace(/\/+$/, "");
+  return (process.env.OCEAN_LICENSE_SERVER ?? "https://distro.virusrecord.com").replace(/\/+$/, "");
 }
 
 const HEARTBEAT_INTERVAL_MS = 15 * 60 * 1000;

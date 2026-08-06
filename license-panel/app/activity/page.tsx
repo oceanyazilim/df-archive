@@ -1,25 +1,35 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Activity as ActivityIcon, Download, Search } from "lucide-react";
 import { Shell } from "../shell";
-import { Badge, Panel, api, fmt } from "../ui";
+import { ACTION_LABEL, Button, EmptyState, OutcomeBadge, PageHead, Panel, Skeleton, Table, api, fmt } from "../ui";
 
 type EventRow = {
   at: string; action: string; outcome: string; keyId: string | null; keyLabel: string | null;
   deviceId: string | null; ip: string | null; userAgent: string | null; detail: string | null;
 };
 
-const OUTCOMES = ["all", "ok", "unknown_key", "revoked", "expired", "device_limit", "invalid_token", "device_blocked"];
+const OUTCOMES = [
+  { value: "all", label: "All results" },
+  { value: "ok", label: "Accepted" },
+  { value: "unknown_key", label: "Unknown key" },
+  { value: "revoked", label: "Revoked" },
+  { value: "expired", label: "Expired" },
+  { value: "device_limit", label: "Device limit" },
+  { value: "invalid_token", label: "Not activated" },
+  { value: "device_blocked", label: "Blocked device" },
+];
 
 export default function ActivityPage() {
   return (
     <Shell active="/activity">
-      <Activity />
+      <ActivityView />
     </Shell>
   );
 }
 
-function Activity() {
+function ActivityView() {
   const [events, setEvents] = useState<EventRow[] | null>(null);
   const [outcome, setOutcome] = useState("all");
   const [query, setQuery] = useState("");
@@ -36,64 +46,63 @@ function Activity() {
     !q || [e.keyLabel, e.ip, e.deviceId, e.detail].some((v) => v?.toLowerCase().includes(q))
   );
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-[17px] font-semibold tracking-tight">Activity</h1>
-        <p className="mt-0.5 text-[12.5px] text-foreground-muted">
-          Every request the desktop app made, with the IP address it came from and the exact time.
-        </p>
-      </div>
+  const exportCsv = () => {
+    const head = ["time", "event", "result", "key", "ip", "device", "detail"];
+    const rows = shown.map((e) => [e.at, e.action, e.outcome, e.keyLabel ?? "", e.ip ?? "", e.deviceId ?? "", e.detail ?? ""]);
+    const csv = [head, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `virus-records-activity-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Filter by key, IP or device…"
-          className="h-9 max-w-[300px]"
-        />
-        <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-9 max-w-[200px]">
-          {OUTCOMES.map((o) => <option key={o} value={o}>{o === "all" ? "All results" : o}</option>)}
+  return (
+    <div>
+      <PageHead
+        title="Activity"
+        description="Every request the desktop app made, with the address it came from and the exact time."
+        actions={<Button size="sm" variant="secondary" onClick={exportCsv} disabled={!shown.length}><Download className="size-3.5" aria-hidden /> Export CSV</Button>}
+      />
+
+      <div className="anim-in mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex h-9 min-w-[240px] flex-1 items-center gap-2 rounded-[7px] border border-border-strong bg-input px-2.5">
+          <Search className="size-3.5 shrink-0 text-foreground-muted" aria-hidden />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter by key, IP address or computer…"
+            className="h-full w-full border-0 bg-transparent p-0 text-[13px] outline-none focus:shadow-none"
+          />
+        </div>
+        <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="h-9 max-w-[190px]">
+          {OUTCOMES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <span className="text-[12px] text-foreground-muted">{shown.length} record{shown.length === 1 ? "" : "s"}</span>
       </div>
 
-      <Panel>
+      <Panel className="anim-in anim-in-1">
         {events === null ? (
-          <p className="py-6 text-center text-[12.5px] text-foreground-muted">Loading…</p>
+          <div className="space-y-2">{[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
         ) : shown.length === 0 ? (
-          <p className="py-6 text-center text-[12.5px] text-foreground-muted">Nothing matches.</p>
+          <EmptyState icon={<ActivityIcon className="size-6" aria-hidden />} title="Nothing here" description="No request matches this filter." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="border-b border-border-subtle text-left text-[10.5px] uppercase tracking-wide text-foreground-muted">
-                  <th className="py-2 pr-3 font-medium">Time</th>
-                  <th className="py-2 pr-3 font-medium">Event</th>
-                  <th className="py-2 pr-3 font-medium">Key</th>
-                  <th className="py-2 pr-3 font-medium">IP</th>
-                  <th className="py-2 pr-3 font-medium">Device</th>
-                  <th className="py-2 pr-3 font-medium">Result</th>
-                  <th className="py-2 font-medium">Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((e, i) => (
-                  <tr key={`${e.at}-${i}`} className="border-b border-border-subtle last:border-0 hover:bg-card-hover">
-                    <td className="whitespace-nowrap py-2 pr-3 text-foreground-secondary">{fmt(e.at)}</td>
-                    <td className="py-2 pr-3 text-foreground-secondary">{e.action}</td>
-                    <td className="py-2 pr-3 font-mono text-[11.5px]">
-                      {e.keyId ? <a href={`/keys/${e.keyId}`} className="text-foreground-muted hover:text-accent hover:underline">{e.keyLabel}</a> : <span className="text-foreground-muted">—</span>}
-                    </td>
-                    <td className="py-2 pr-3 font-mono text-[11.5px] text-foreground-muted">{e.ip ?? "—"}</td>
-                    <td className="max-w-[150px] truncate py-2 pr-3 font-mono text-[11px] text-foreground-muted" title={e.deviceId ?? ""}>{e.deviceId ?? "—"}</td>
-                    <td className="py-2 pr-3"><Badge tone={e.outcome === "ok" ? "success" : "danger"}>{e.outcome}</Badge></td>
-                    <td className="max-w-[200px] truncate py-2 text-foreground-muted" title={e.detail ?? ""}>{e.detail ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table head={["Time", "Event", "Key", "IP address", "Computer", "Result", "Detail"]}>
+            {shown.map((e, i) => (
+              <tr key={`${e.at}-${i}`} className="border-b border-border-subtle last:border-0 hover:bg-card-hover">
+                <td className="whitespace-nowrap py-2.5 pr-3 text-foreground-secondary">{fmt(e.at)}</td>
+                <td className="py-2.5 pr-3 text-foreground-secondary">{ACTION_LABEL[e.action] ?? e.action}</td>
+                <td className="py-2.5 pr-3 font-mono text-[11.5px]">
+                  {e.keyId ? <a href={`/keys/${e.keyId}`} className="text-foreground-muted hover:text-accent hover:underline">{e.keyLabel}</a> : <span className="text-foreground-muted">—</span>}
+                </td>
+                <td className="py-2.5 pr-3 font-mono text-[11.5px] text-foreground-muted">{e.ip ?? "—"}</td>
+                <td className="max-w-[140px] truncate py-2.5 pr-3 font-mono text-[11px] text-foreground-muted" title={e.deviceId ?? ""}>{e.deviceId ?? "—"}</td>
+                <td className="py-2.5 pr-3"><OutcomeBadge outcome={e.outcome} /></td>
+                <td className="max-w-[180px] truncate py-2.5 text-foreground-muted" title={e.detail ?? ""}>{e.detail ?? "—"}</td>
+              </tr>
+            ))}
+          </Table>
         )}
       </Panel>
     </div>

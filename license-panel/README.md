@@ -2,7 +2,7 @@
 
 The panel that issues the keys unlocking the desktop app, and the audit trail
 that shows where each key is being used. Runs standalone: no database server,
-no external service. Deployed on Dokploy at **virusrecords.net**.
+no external service. Deployed on Dokploy at **distro.virusrecord.com**.
 
 ## Deploy on Dokploy
 
@@ -18,7 +18,7 @@ no external service. Deployed on Dokploy at **virusrecords.net**.
 
 3. **Volume** — mount a persistent volume at `/data`. Without it every
    redeploy wipes the issued keys.
-4. **Domain** — `virusrecords.net`, port `3000`, HTTPS on.
+4. **Domain** — `distro.virusrecord.com`, port `3000`, HTTPS on.
 5. Health check path: `/api/health`.
 
 The panel sets `noindex` and has no public pages: every route except the
@@ -33,7 +33,7 @@ app-facing API requires the password.
 | `POST /api/v1/spotify` | desktop app | Reports the Spotify identity the user consented to link. |
 
 The desktop app points at the panel via `OCEAN_LICENSE_SERVER`
-(default `https://virusrecords.net`).
+(default `https://distro.virusrecord.com`).
 
 ## Key types
 
