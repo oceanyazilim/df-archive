@@ -6,7 +6,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Ocean Distro Finder",
+  title: "Virus Records — Distro Finder",
   description: "Track intelligence, distributor identification and cross-platform analytics.",
 };
 

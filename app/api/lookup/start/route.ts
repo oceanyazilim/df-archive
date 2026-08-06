@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractSpotifyTrackId } from "@core/spotifyMetadata";
 import { createLookup } from "@core/connectorStore";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,8 @@ export const dynamic = "force-dynamic";
  * Creates a short-lived pending lookup keyed by the public Spotify track id.
  */
 export async function POST(req: NextRequest) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;

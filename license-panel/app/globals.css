@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Virus Records design tokens ----
+   Distinct from the Ocean panel's blue: near-black surfaces, acid-lime accent,
+   violet for secondary emphasis. Components never hardcode a color. */
+:root {
+  --background: #07080A;
+  --surface: #101319;
+  --surface-raised: #151921;
+  --surface-hover: #191E27;
+  --input-bg: #0B0E13;
+  --border: rgba(255, 255, 255, 0.11);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --text-primary: #F4F6F8;
+  --text-secondary: #98A1AE;
+  --text-muted: #626B78;
+  --accent: #9CF04A;
+  --accent-hover: #B4FF6B;
+  --accent-dim: rgba(156, 240, 74, 0.12);
+  --accent-violet: #A98BFF;
+  --success: #4ADE80;
+  --warning: #F5B94C;
+  --danger: #FF6B7E;
+  --on-accent: #0A1503;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --radius-lg: 16px;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+::selection { background: var(--accent-dim); }
+
+input, select, textarea {
+  background: var(--input-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 11px;
+  font: inherit;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+input::placeholder { color: var(--text-muted); }
+
+/* The virus mark: a lime ring with a dark core, drawn in CSS so the panel
+   ships without image assets. */
+.vr-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: radial-gradient(circle at 30% 25%, var(--accent), #4C8F1C 78%);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--on-accent);
+  letter-spacing: -0.02em;
+  box-shadow: 0 0 0 1px rgba(156, 240, 74, 0.25), 0 6px 20px rgba(156, 240, 74, 0.12);
+}
+
+.scrollbar-thin::-webkit-scrollbar { width: 9px; height: 9px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }

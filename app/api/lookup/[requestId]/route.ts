@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLookup } from "@core/connectorStore";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** GET /api/lookup/{requestId} — current status + result (safe fields only). */
 export async function GET(_req: NextRequest, ctx: { params: { requestId: string } }) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   const lookup = getLookup(ctx.params.requestId);
   if (!lookup) {
     return NextResponse.json({ error: { code: "LOOKUP_NOT_FOUND", message: "Unknown or expired request id." } }, { status: 404 });

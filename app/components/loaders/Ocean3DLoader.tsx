@@ -24,7 +24,7 @@ function sceneHeight(props: Pick<Ocean3DLoaderProps, "fullscreen" | "compact">):
 }
 
 const MODE_ARIA_TEXT: Record<Ocean3DLoaderProps["mode"], string> = {
-  "app-initialization": "Ocean Distro Finder is loading",
+  "app-initialization": "Virus Records is loading",
   "page-transition": "Loading the next page",
   "distributor-search": "Searching for distributor information",
   "catalog-analysis": "Analyzing artist catalog",

@@ -15,6 +15,9 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 .DS_Store
 .data/
+# Issued license keys + audit trail when the panel runs locally (production
+# keeps these in a Docker volume). Never commit real keys.
+license-panel/data/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 # Do NOT ignore .env.example (it is a safe template)

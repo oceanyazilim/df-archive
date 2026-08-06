@@ -78,6 +78,12 @@ function forkServer() {
       // the user, not the app bundle — one consent must outlive app updates.
       DISTRO_SPOTIFY_ACCOUNT_PATH:
         process.env.DISTRO_SPOTIFY_ACCOUNT_PATH || path.join(app.getPath("userData"), "spotify-account.json"),
+      // Same for the license: activating once must survive app updates, and
+      // the device id inside it is what the panel counts as "this computer".
+      DISTRO_LICENSE_PATH:
+        process.env.DISTRO_LICENSE_PATH || path.join(app.getPath("userData"), "license.json"),
+      OCEAN_LICENSE_SERVER: process.env.OCEAN_LICENSE_SERVER || "https://virusrecords.net",
+      OCEAN_APP_VERSION: app.getVersion(),
     },
     stdio: "pipe",
     serviceName: "distro-finder-server",
@@ -390,6 +396,9 @@ function startBridgeLoops() {
     // A Spotify self-update also wipes the Spicetify companion — repair it
     // automatically (guarded by its own cooldown; cheap FS checks otherwise).
     maybeRepairCompanion().catch(() => {});
+    // License check-in. The server module decides whether the panel actually
+    // needs contacting (15-minute interval), so calling it every beat is free.
+    fetch(`${BASE}/api/license/status`).catch(() => {});
   };
   // The analyzer pump runs on its own cadence: it must feel instant in the
   // Spotify UI, but it is a single cheap evaluate when nothing is pending.

@@ -3,6 +3,7 @@ import { buildPlaylistCatalog } from "@core/playlist/catalog";
 import { SoundchartsError } from "@core/soundcharts/errors";
 import { PoolUnavailableError } from "@core/credentialPool";
 import { ADMIN_COOKIE_NAME, isValidAdminSession } from "@core/adminStore";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ const ID_RE = /^[A-Za-z0-9]{22}$/;
  * removed history and drives many provider calls.
  */
 export async function GET(req: NextRequest, ctx: { params: { playlistId: string } }) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
   if (!isValidAdminSession(token)) {
     return NextResponse.json({ error: { code: "ADMIN_ONLY", message: "Playlist analysis is only available to the site admin. Sign in from the user menu." } }, { status: 403 });

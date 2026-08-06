@@ -1,0 +1,26 @@
+# Dokploy: point the application at this compose file (or just the Dockerfile
+# and set the same environment + volume in the UI).
+#
+# The domain (virusrecords.net) is attached by Dokploy's proxy — no ports need
+# to be published manually when it manages routing.
+
+services:
+  panel:
+    build: .
+    restart: unless-stopped
+    environment:
+      # Required. PANEL_SECRET signs the admin session cookie (>= 16 chars).
+      PANEL_PASSWORD: ${PANEL_PASSWORD:?set a panel password}
+      PANEL_SECRET: ${PANEL_SECRET:?set a session secret}
+      DATA_DIR: /data
+    volumes:
+      # Issued keys and the audit trail live here. Never remove this volume.
+      - license-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  license-data:

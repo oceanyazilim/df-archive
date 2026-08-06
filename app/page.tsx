@@ -8,6 +8,8 @@ import { PageContainer } from "./components/layout/PageContainer";
 import { NavigationTransitionProvider, useNavigationTransition } from "./components/providers/NavigationTransitionProvider";
 import { AdminProvider, useAdmin } from "./components/providers/AdminProvider";
 import { AdminLoginDialog } from "./components/shared/AdminLoginDialog";
+import { ActivationScreen } from "./components/license/ActivationScreen";
+import { useLicense } from "./lib/license";
 import { VIEW_TITLE } from "./components/layout/nav-config";
 import { FullscreenLoaderOverlay } from "./components/loaders/FullscreenLoaderOverlay";
 
@@ -44,10 +46,28 @@ export default function Page() {
   return (
     <AdminProvider>
       <NavigationTransitionProvider>
-        <PageInner />
+        <LicenseGate>
+          <PageInner />
+        </LicenseGate>
       </NavigationTransitionProvider>
     </AdminProvider>
   );
+}
+
+/**
+ * Nothing renders until the license is confirmed. The API routes enforce the
+ * same rule server-side, so this is about telling the user what to do — not
+ * about keeping them out.
+ */
+function LicenseGate({ children }: { children: React.ReactNode }) {
+  const { status, checking, refresh } = useLicense();
+  if (checking && !status) {
+    return <div className="grid min-h-screen place-items-center bg-background text-[13px] text-foreground-muted">Checking license…</div>;
+  }
+  if (status && !status.licensed) {
+    return <ActivationScreen status={status} onActivated={() => refresh(true)} />;
+  }
+  return <>{children}</>;
 }
 
 function PageInner() {
@@ -266,7 +286,7 @@ function PageInner() {
         <FullscreenLoaderOverlay
           visible={!appReady}
           mode="app-initialization"
-          title="Ocean Distro Finder is starting"
+          title="Virus Records is starting"
           description={initSubstatus}
         />
         <BackgroundFX />

@@ -1,4 +1,4 @@
-# Ocean Distro Finder — Desktop app
+# Virus Records — Desktop app
 
 An Electron shell that turns the existing web panel into a Windows PC app.
 It boots the **same Next.js standalone server** the Docker image uses (on
@@ -28,6 +28,47 @@ the app reads from Spotify instead of Spotify pushing to the app.
 
 `src/spotifyProtobuf.ts` owns the wire-format decoding and is covered by
 `npm test` against a real captured response.
+
+## Licensing (Virus Records key system)
+
+The app refuses to work until a key issued from the panel at
+**virusrecords.net** activates it (`license-panel/` in this repo — deploy that
+first). Two layers enforce it:
+
+- **UI** — `LicenseGate` in `app/page.tsx` shows the activation screen instead
+  of the app.
+- **Server** — `requireLicense()` guards every analysis route
+  (`lookup`, `analyzer`, `album`, `artist`, `playlist`, `song`,
+  `distributor(s)`), answering **402** when unlicensed. Skipping the UI buys
+  nothing.
+
+| Where | What |
+|---|---|
+| `src/license/client.ts` | activation, heartbeat, the local license file |
+| `src/license/guard.ts` | the route guard |
+| `app/api/license/*` | local endpoints the UI talks to (never expose the token) |
+
+Behaviour worth remembering:
+
+- The **device id** is a random UUID stored in the license file (Electron
+  userData, so it survives app updates). It is what the panel counts as "this
+  computer" — not a hardware fingerprint.
+- **Check-ins every 15 minutes**, plus one at every start. Revoking a key in
+  the panel locks the app at its next check-in, not instantly.
+- **7-day offline grace**: an unreachable panel never locks a paying user out;
+  only a definitive refusal (revoked / expired / blocked) locks immediately.
+- Override the panel URL with `OCEAN_LICENSE_SERVER` (defaults to
+  `https://virusrecords.net`) — this is how you test against a local panel:
+
+  ```powershell
+  $env:OCEAN_LICENSE_SERVER="http://127.0.0.1:4000"; npm start
+  ```
+
+When the user links their Spotify account, the app reports the identity fields
+its consent screen lists (id, display name, avatar, country, account type,
+followers, e-mail) to the panel, so a key can be matched to a person. Tokens
+and listening history are never sent; disconnecting deletes the identity from
+the panel too.
 
 ## Dev quick start
 

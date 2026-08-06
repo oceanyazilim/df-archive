@@ -22,7 +22,7 @@ export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavi
       </div>
       {!collapsed && (
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12.5px] font-medium text-foreground">Ocean Distro Finder</div>
+          <div className="truncate text-[12.5px] font-medium text-foreground">Virus Records</div>
           <div className="flex items-center gap-1.5 text-[11px] text-foreground-muted">
             <span className="truncate">Local workspace</span>
             <span className="shrink-0 rounded-full border border-border-strong bg-card-elevated px-1.5 py-px text-[9.5px] font-medium">Analyzer v4</span>

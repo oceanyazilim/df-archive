@@ -3,7 +3,7 @@
 /** System views: UUID Directory, System Status, Settings (theme, background, connector). */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Music2, RefreshCw, Search, Wifi } from "lucide-react";
+import { KeyRound, Music2, RefreshCw, Search, Wifi } from "lucide-react";
 import { PageHead as NewPageHead } from "../shared/PageHead";
 import { StatCard } from "../shared/StatCard";
 import { SkeletonStatCard } from "../shared/Skeleton";
@@ -15,6 +15,7 @@ import { Panel } from "../shared/Card";
 import { Button } from "../shared/Button";
 import { GradientCustomizer } from "../GradientCustomizer";
 import { queryConnectorState, startPairing, requestBridgeReconnect, queryBridgeCommandResult, ConnectorState } from "../../lib/connector";
+import { useLicense } from "../../lib/license";
 import { Health, jget } from "../../lib/types";
 
 type Tone = NonNullable<StatusBadgeProps["tone"]>;
@@ -119,12 +120,13 @@ export function SettingsView({ health }: { health: Health | null }) {
       <Panel title="Appearance" description="Off by default — a subtle animated backdrop, always low-opacity and never affecting readability.">
         <GradientCustomizer />
       </Panel>
+      <LicenseSettings />
       <ConnectorSettings />
       <SpotifyAccountSettings />
       <CredentialPools health={health} />
       <Panel title="Application">
         <div className="divide-y divide-border-subtle">
-          <Row k="Name" v="Ocean Distro Finder" />
+          <Row k="Name" v="Virus Records — Distro Finder" />
           <Row k="Version" v="1.0.0" />
           <div className="flex items-center justify-between py-2.5 text-[13px]">
             <span className="text-foreground-secondary">Lookup service</span>
@@ -133,6 +135,15 @@ export function SettingsView({ health }: { health: Health | null }) {
           <Row k="Distributor records" v={`${health?.uuidMappingCount ?? "—"}`} />
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function ProfileRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2 text-[12.5px]">
+      <span className="text-foreground-muted">{k}</span>
+      <span className={`text-right text-foreground ${mono ? "font-mono text-[11.5px]" : ""}`}>{v}</span>
     </div>
   );
 }
@@ -249,10 +260,66 @@ function CredentialPools({ health }: { health: Health | null }) {
   );
 }
 
+/**
+ * License state for this installation. Read-only by design: keys are issued
+ * from the Virus Records panel, never from inside the app.
+ */
+function LicenseSettings() {
+  const { status, refresh } = useLicense();
+  const [busy, setBusy] = useState(false);
+
+  if (!status) return null;
+  const badge: { tone: Tone; label: string } =
+    status.state === "active" ? { tone: "success", label: "Activated" }
+    : status.state === "grace" ? { tone: "warning", label: "Activated · verifying" }
+    : status.state === "locked" ? { tone: "danger", label: "Locked" }
+    : { tone: "neutral", label: "Not activated" };
+
+  return (
+    <Panel title="License" description="This copy is unlocked by a key issued from the Virus Records panel.">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-[13px] text-foreground-secondary"><KeyRound className="size-3.5" aria-hidden /> Status</span>
+        <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+      </div>
+      <div className="mt-2 divide-y divide-border-subtle">
+        <Row k="Key" v={status.keyMasked ?? "—"} />
+        <Row k="Type" v={status.type === "single" ? "Single use" : status.type === "duration" ? "Timed" : status.type === "unlimited" ? "Unlimited" : "—"} />
+        <Row k="Expires" v={status.expiresAt ? new Date(status.expiresAt).toLocaleDateString() : "Never"} />
+        <Row k="Last verified" v={status.lastCheckAt ? new Date(status.lastCheckAt).toLocaleString() : "—"} />
+        <Row k="This device" v={status.deviceId.slice(0, 8)} />
+      </div>
+      {status.note && <p className="mt-2 text-[11.5px] text-foreground-muted">Note from the issuer: {status.note}</p>}
+      <div className="mt-3">
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={busy}
+          onClick={async () => {
+            if (!window.confirm("Sign this computer out of its license? You will need the key again to keep using the app.")) return;
+            setBusy(true);
+            await fetch("/api/license/activate", { method: "DELETE" }).catch(() => {});
+            setBusy(false);
+            refresh(true);
+          }}
+        >
+          Remove license from this computer
+        </Button>
+      </div>
+      <p className="mt-2 text-[11px] text-foreground-muted">
+        Activations and periodic checks record the time and IP address at {new URL(status.server).host} — that is how shared keys are detected.
+      </p>
+    </Panel>
+  );
+}
+
 type SpotifyAccountState = {
   connected: boolean;
   needsReauth: boolean;
-  profile: { id: string; displayName: string | null; avatarUrl: string | null } | null;
+  profile: {
+    id: string; displayName: string | null; avatarUrl: string | null;
+    country: string | null; product: string | null; followers: number | null;
+    email: string | null; spotifyUrl: string | null;
+  } | null;
   connectedAt: string | null;
 };
 
@@ -310,7 +377,7 @@ function SpotifyAccountSettings() {
   const connected = !!st?.connected && !st?.needsReauth;
 
   return (
-    <Panel title="Spotify Account" description="Optional — connect your own Spotify account with your explicit consent on Spotify's official page. The app never sees your password, and you can revoke access any time at spotify.com/account/apps.">
+    <Panel title="Spotify Account" description="Connect your own Spotify account with your explicit consent on Spotify's official page. The app never sees your password, and you can revoke access any time at spotify.com/account/apps.">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-[13px] text-foreground-secondary"><Music2 className="size-3.5" aria-hidden /> Account</span>
         {st === null ? (
@@ -325,21 +392,52 @@ function SpotifyAccountSettings() {
       </div>
 
       {connected && st?.profile && (
-        <div className="mt-3 flex items-center gap-3">
-          {st.profile.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={st.profile.avatarUrl} alt="" className="size-9 rounded-full border border-border-strong object-cover" />
-          ) : (
-            <div className="grid size-9 place-items-center rounded-full border border-border-strong bg-card-elevated text-[13px] font-semibold text-foreground-secondary">
-              {(st.profile.displayName ?? st.profile.id).slice(0, 1).toUpperCase()}
+        <div className="mt-3 rounded-md border border-border-strong bg-card-elevated p-3.5">
+          <div className="flex items-center gap-3">
+            {st.profile.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={st.profile.avatarUrl} alt="" className="size-12 rounded-full border border-border-strong object-cover" />
+            ) : (
+              <div className="grid size-12 place-items-center rounded-full border border-border-strong bg-card text-[15px] font-semibold text-foreground-secondary">
+                {(st.profile.displayName ?? st.profile.id).slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-[14px] font-semibold text-foreground">{st.profile.displayName ?? st.profile.id}</span>
+                {st.profile.product && <StatusBadge tone={st.profile.product === "premium" ? "success" : "neutral"}>{st.profile.product}</StatusBadge>}
+              </div>
+              <div className="text-[11.5px] text-foreground-muted">
+                Connected {st.connectedAt ? new Date(st.connectedAt).toLocaleDateString() : ""} · used automatically when no API key is available
+              </div>
             </div>
-          )}
-          <div className="min-w-0">
-            <div className="truncate text-[13px] font-medium text-foreground">{st.profile.displayName ?? st.profile.id}</div>
-            <div className="text-[11.5px] text-foreground-muted">
-              Connected {st.connectedAt ? new Date(st.connectedAt).toLocaleDateString() : ""} · used automatically when no API key is available
-            </div>
+            {st.profile.spotifyUrl && (
+              <a href={st.profile.spotifyUrl} target="_blank" rel="noreferrer" className="shrink-0 text-[12px] text-accent hover:underline">
+                Open profile
+              </a>
+            )}
           </div>
+          <div className="mt-3 divide-y divide-border-subtle border-t border-border-subtle">
+            <ProfileRow k="Spotify user ID" v={st.profile.id} mono />
+            <ProfileRow k="E-mail" v={st.profile.email ?? "—"} />
+            <ProfileRow k="Country" v={st.profile.country ?? "—"} />
+            <ProfileRow k="Account type" v={st.profile.product ?? "—"} />
+            <ProfileRow k="Followers" v={st.profile.followers !== null ? st.profile.followers.toLocaleString() : "—"} />
+          </div>
+        </div>
+      )}
+
+      {/* Consent notice. It names the exact fields that leave this computer —
+          if the reported set ever changes, this text must change with it. */}
+      {!connected && (
+        <div className="mt-3 rounded-md border border-border-strong bg-card-elevated p-3 text-[11.5px] leading-relaxed text-foreground-secondary">
+          <p className="mb-1.5 font-medium text-foreground">What is shared when you connect</p>
+          <p>
+            Your Spotify <b>user ID, display name, profile picture, country, account type (free/premium), follower
+            count and e-mail address</b> are sent to the Virus Records license panel, so a licensed copy can be matched
+            to its owner. Your Spotify password, your access tokens and your listening history are <b>never</b> sent
+            anywhere. Disconnecting deletes this information from the panel as well.
+          </p>
         </div>
       )}
 
@@ -348,7 +446,7 @@ function SpotifyAccountSettings() {
           <Button variant="secondary" size="sm" onClick={disconnect}>Disconnect</Button>
         ) : (
           <Button variant="primary" size="sm" loading={waiting} onClick={connect}>
-            {waiting ? "Waiting for Spotify…" : st?.needsReauth ? "Reconnect Spotify account" : "Connect Spotify account"}
+            {waiting ? "Waiting for Spotify…" : st?.needsReauth ? "Reconnect Spotify account" : "Connect and share the above"}
           </Button>
         )}
         {waiting && (

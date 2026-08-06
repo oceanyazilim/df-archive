@@ -2,34 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---- Design tokens: premium dark theme. Never hardcode colors in components. ----
+/* ---- Design tokens: Virus Records dark theme. Never hardcode colors in components. ----
    Solid charcoal surfaces (not translucent-on-black), thin low-opacity borders,
-   ocean-blue accent. There is no light mode. */
+   acid-lime accent with a violet counterpart. There is no light mode. */
 :root, :root[data-theme="dark"] {
   --background: #000000;
   --sidebar: #000000;
   --header: rgba(0, 0, 0, 0.88);
-  --surface: #11161D;
-  --surface-raised: #151B23;
-  --surface-hover: #171D26;
-  --input-bg: #0D1218;
+  --surface: #101319;
+  --surface-raised: #151921;
+  --surface-hover: #191E27;
+  --input-bg: #0B0E13;
   --border: rgba(255, 255, 255, 0.12);
   --border-subtle: rgba(255, 255, 255, 0.07);
   --text-primary: #FFFFFF;
-  --text-secondary: #919AAA;
-  --text-muted: #626C7A;
-  --accent: #39BDF8;
-  --accent-hover: #1578FF;
-  --accent-secondary: #1578FF;
-  --accent-purple: #8B7CFF;
-  --success: #36D67E;
+  --text-secondary: #98A1AE;
+  --text-muted: #626B78;
+  --accent: #9CF04A;
+  --accent-hover: #B4FF6B;
+  --accent-deep: #4C8F1C;
+  --accent-secondary: #A98BFF;
+  --accent-purple: #A98BFF;
+  --success: #4ADE80;
   --warning: #F5B94C;
-  --danger: #FF647C;
-  --focus-ring: rgba(57, 189, 248, 0.28);
-  --on-accent: #04141C;
-  --chart-primary: #39BDF8;
-  --chart-secondary: #1578FF;
-  --accent-dim: rgba(57, 189, 248, 0.12);
+  --danger: #FF6B7E;
+  --focus-ring: rgba(156, 240, 74, 0.26);
+  --on-accent: #0A1503;
+  --chart-primary: #9CF04A;
+  --chart-secondary: #A98BFF;
+  --accent-dim: rgba(156, 240, 74, 0.12);
   --skeleton-hi: rgba(255, 255, 255, 0.08);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.55);

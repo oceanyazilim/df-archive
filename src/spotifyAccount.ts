@@ -20,6 +20,7 @@ import { createHash, randomBytes } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { SPOTIFY } from "./config";
+import { reportSpotifyIdentity } from "./license/client";
 import { logger } from "./logger";
 
 const ACCOUNT_PATH =
@@ -41,7 +42,10 @@ export function oauthClientId(): string {
  * asked for anything the app does not use. Override with SPOTIFY_OAUTH_SCOPES.
  */
 function oauthScopes(): string {
-  return process.env.SPOTIFY_OAUTH_SCOPES ?? "";
+  // user-read-private + user-read-email are what /me needs to return country,
+  // account type and address — the fields the app shows and the panel records.
+  // Nothing beyond identity is requested; the consent screen lists them.
+  return process.env.SPOTIFY_OAUTH_SCOPES ?? "user-read-private user-read-email";
 }
 
 function redirectUri(origin: string): string {
@@ -70,7 +74,19 @@ type StoredAccount = {
   accessExpiresAt: number;
   scope: string;
   connectedAt: number;
-  profile: { id: string; displayName: string | null; avatarUrl: string | null };
+  profile: SpotifyProfile;
+};
+
+/** Identity fields only — exactly what the consent screen lists. */
+export type SpotifyProfile = {
+  id: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  country: string | null;
+  product: string | null;
+  followers: number | null;
+  email: string | null;
+  spotifyUrl: string | null;
 };
 
 let account: StoredAccount | null = null;
@@ -95,6 +111,11 @@ function ensureLoaded(): void {
           id: j.profile.id,
           displayName: typeof j.profile.displayName === "string" ? j.profile.displayName : null,
           avatarUrl: typeof j.profile.avatarUrl === "string" ? j.profile.avatarUrl : null,
+          country: typeof j.profile.country === "string" ? j.profile.country : null,
+          product: typeof j.profile.product === "string" ? j.profile.product : null,
+          followers: typeof j.profile.followers === "number" ? j.profile.followers : null,
+          email: typeof j.profile.email === "string" ? j.profile.email : null,
+          spotifyUrl: typeof j.profile.spotifyUrl === "string" ? j.profile.spotifyUrl : null,
         },
       };
     }
@@ -178,8 +199,9 @@ export async function completeAuth(
     return { ok: false, code: "EXCHANGE_FAILED", message: `Spotify did not accept the authorization (${why}).` };
   }
 
-  // Who connected? Only safe display fields are kept.
-  let profile: StoredAccount["profile"] = { id: "", displayName: null, avatarUrl: null };
+  // Who connected? Identity fields only — the exact set named on the consent
+  // screen, so what the user agreed to and what is stored cannot drift apart.
+  let profile: SpotifyProfile = { id: "", displayName: null, avatarUrl: null, country: null, product: null, followers: null, email: null, spotifyUrl: null };
   try {
     const me = await fetch(`${SPOTIFY.apiBase}/me`, {
       headers: { Authorization: `Bearer ${json.access_token}` },
@@ -188,10 +210,17 @@ export async function completeAuth(
     const mj = (await me.json().catch(() => ({}))) as Record<string, unknown>;
     if (me.ok && typeof mj.id === "string") {
       const images = Array.isArray(mj.images) ? (mj.images as { url?: string }[]) : [];
+      const followers = (mj.followers as Record<string, unknown> | undefined)?.total;
       profile = {
         id: mj.id,
         displayName: typeof mj.display_name === "string" ? mj.display_name : null,
         avatarUrl: images[0]?.url ?? null,
+        country: typeof mj.country === "string" ? mj.country : null,
+        product: typeof mj.product === "string" ? mj.product : null,
+        followers: typeof followers === "number" ? followers : null,
+        email: typeof mj.email === "string" ? mj.email : null,
+        spotifyUrl: typeof (mj.external_urls as Record<string, unknown> | undefined)?.spotify === "string"
+          ? String((mj.external_urls as Record<string, unknown>).spotify) : null,
       };
     }
   } catch { /* profile is cosmetic — the link still works without it */ }
@@ -208,6 +237,17 @@ export async function completeAuth(
   needsReauth = false;
   persist();
   logger.info({ event: "spotify_account_connected", matchStatus: profile.id || "unknown" });
+  // Tell the license panel which account this installation belongs to — the
+  // identity set the consent screen names, nothing else. Fire-and-forget.
+  void reportSpotifyIdentity({
+    id: profile.id,
+    displayName: profile.displayName,
+    avatarUrl: profile.avatarUrl,
+    country: profile.country,
+    product: profile.product,
+    followers: profile.followers,
+    email: profile.email,
+  });
   return { ok: true, displayName: profile.displayName };
 }
 
@@ -215,7 +255,7 @@ export async function completeAuth(
 export function accountStatus(): {
   connected: boolean;
   needsReauth: boolean;
-  profile: { id: string; displayName: string | null; avatarUrl: string | null } | null;
+  profile: SpotifyProfile | null;
   scope: string | null;
   connectedAt: string | null;
 } {
@@ -232,6 +272,8 @@ export function accountStatus(): {
 export function disconnectAccount(): boolean {
   ensureLoaded();
   const had = !!account;
+  // Unlinking here must also delete the identity held by the license panel.
+  if (had) void reportSpotifyIdentity(null);
   account = null;
   needsReauth = false;
   persist();

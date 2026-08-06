@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveDistributorByLicensorUuid } from "@core/distributor/resolver";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;

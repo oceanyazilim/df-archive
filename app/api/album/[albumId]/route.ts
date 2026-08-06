@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveAlbum } from "@core/album/service";
 import { SoundchartsError } from "@core/soundcharts/errors";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +10,8 @@ const ALBUM_RE = /^[A-Za-z0-9]{22}$/;
 
 /** GET /api/album/{albumId} — release metadata + ordered tracklist (no per-track analysis). */
 export async function GET(_req: NextRequest, ctx: { params: { albumId: string } }) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   const albumId = ctx.params.albumId;
   if (!ALBUM_RE.test(albumId)) return NextResponse.json({ error: { code: "INVALID_LOOKUP_INPUT", message: "Invalid Spotify album id." } }, { status: 400 });
   try {

@@ -7,6 +7,7 @@ import { getLookupConfig } from "@core/soundcharts/config";
 import { parseMusicLookupInput } from "@core/validation/musicInput";
 import { findAlbumIdByUpc } from "@core/spotify";
 import { SoundchartsError } from "@core/soundcharts/errors";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ const MAX_BODY = 4 * 1024;
  *   - { kind: "track", ...workspace } for a single track / ISRC / Soundcharts UUID
  */
 export async function POST(req: NextRequest) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   const raw = await req.text();
   if (raw.length > MAX_BODY) return NextResponse.json({ error: { code: "INVALID_LOOKUP_INPUT", message: "Request body too large." } }, { status: 413 });
   let body: Record<string, unknown>;

@@ -3,6 +3,7 @@ import { analyze, AnalyzerError, AnalyzerKind } from "@core/analyzer/service";
 import { SoundchartsError } from "@core/soundcharts/errors";
 import { normalizeLicensorUuid } from "@core/spotifyMetadata";
 import { CONNECTOR_CORS, corsPreflight } from "../../../connector/cors";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,8 @@ export async function OPTIONS() { return corsPreflight(); }
  * user's own analytics; no credentials or cookies are involved.
  */
 export async function GET(req: NextRequest, ctx: { params: { kind: string; id: string } }) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   const kind = ctx.params.kind as AnalyzerKind;
   const id = ctx.params.id;
 

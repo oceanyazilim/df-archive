@@ -4,6 +4,7 @@ import { SoundchartsError } from "@core/soundcharts/errors";
 import { PoolUnavailableError } from "@core/credentialPool";
 import { ADMIN_COOKIE_NAME, isValidAdminSession } from "@core/adminStore";
 import { CONNECTOR_CORS, corsPreflight } from "../../../connector/cors";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,8 @@ export async function OPTIONS() { return corsPreflight(); }
  * are filled in progressively by the panel.
  */
 export async function GET(req: NextRequest, ctx: { params: { artistId: string } }) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   const denied = requireAdmin(req);
   if (denied) return denied;
   const artistId = ctx.params.artistId;

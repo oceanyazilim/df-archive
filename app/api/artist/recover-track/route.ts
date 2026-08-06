@@ -3,6 +3,7 @@ import { recoverRemovedTrack } from "@core/artist/recover";
 import { SoundchartsError } from "@core/soundcharts/errors";
 import { PoolUnavailableError } from "@core/credentialPool";
 import { ADMIN_COOKIE_NAME, isValidAdminSession } from "@core/adminStore";
+import { requireLicense } from "@core/license/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ const SPOTIFY_ID_RE = /^[A-Za-z0-9]{22}$/;
  * one is required. Same admin gate as the catalogues this data belongs to.
  */
 export async function GET(req: NextRequest) {
+  const unlicensed = requireLicense();
+  if (unlicensed) return unlicensed;
   const token = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
   if (!isValidAdminSession(token)) {
     return NextResponse.json({ error: { code: "ADMIN_ONLY", message: "Artist analysis is only available to the site admin." } }, { status: 403 });
