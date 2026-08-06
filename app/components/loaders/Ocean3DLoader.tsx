@@ -86,7 +86,7 @@ export function Ocean3DLoader({
               >
                 <ambientLight intensity={0.55} />
                 <directionalLight position={[2.4, 3, 2.6]} intensity={1.1} color="#F4F7FB" />
-                <directionalLight position={[-2.2, -1, -2.4]} intensity={0.65} color="#39BDF8" />
+                <directionalLight position={[-2.2, -1, -2.4]} intensity={0.65} color="#9CF04A" />
                 <OceanLogoScene mode={mode} reducedMotion={reducedMotion} progress01={p01} searchSubstage={searchSubstage} />
               </Canvas>
             </Suspense>

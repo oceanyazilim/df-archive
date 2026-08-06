@@ -69,8 +69,8 @@ export function CatalogActivityChart({ data }: { data: MonthBucket[] }) {
               <XAxis dataKey="label" {...chartAxis} interval="preserveStartEnd" />
               <YAxis allowDecimals={false} {...chartAxis} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-              <Bar dataKey="releases" name="Releases" fill="#1578FF" radius={[3, 3, 0, 0]} maxBarSize={22} />
-              <Line dataKey="tracks" name="Tracks" stroke="#39BDF8" strokeWidth={2} dot={false} type="monotone" />
+              <Bar dataKey="releases" name="Releases" fill="#4C8F1C" radius={[3, 3, 0, 0]} maxBarSize={22} />
+              <Line dataKey="tracks" name="Tracks" stroke="#9CF04A" strokeWidth={2} dot={false} type="monotone" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

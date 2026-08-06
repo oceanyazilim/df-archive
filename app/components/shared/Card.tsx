@@ -31,12 +31,14 @@ export function Panel({ title, description, actions, className, children, ...pro
   return (
     <Card className={cn("p-4 sm:p-5", className)} {...props}>
       {(title || actions) && (
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        // Wraps instead of squeezing: a wide toolbar used to crush the title
+        // to a single letter (the streaming chart's controls are long).
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <div className="min-w-[180px] flex-1">
             {title && <h3 className="text-[15px] font-semibold text-foreground tracking-tight">{title}</h3>}
             {description && <p className="mt-0.5 text-xs text-foreground-secondary">{description}</p>}
           </div>
-          {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
+          {actions && <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>}
         </div>
       )}
       {children}

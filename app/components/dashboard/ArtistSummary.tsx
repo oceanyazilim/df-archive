@@ -55,7 +55,7 @@ export function ArtistSummary({ data, fetchedAt, mainDistributor, distributorCou
     <div className="relative overflow-hidden rounded-lg border border-border-strong bg-card p-5 sm:p-6">
       <div
         className="pointer-events-none absolute -left-24 -top-24 size-72 rounded-full opacity-[0.14] blur-3xl"
-        style={{ background: dominant ?? "#39BDF8" }}
+        style={{ background: dominant ?? "#9CF04A" }}
         aria-hidden
       />
       <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start">

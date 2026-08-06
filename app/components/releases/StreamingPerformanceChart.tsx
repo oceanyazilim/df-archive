@@ -216,14 +216,14 @@ export function StreamingPerformanceChart({
             <CartesianGrid stroke={chartGrid.stroke} vertical={false} />
             <XAxis dataKey="date" ticks={xTicks} tickFormatter={shortDate} {...chartAxis} />
             <YAxis tickFormatter={fmt} {...chartAxis} />
-            <Tooltip content={<ChartTooltip metricUnit={metricDef.unit} />} cursor={{ stroke: "#39BDF8", strokeDasharray: "3 3" }} />
+            <Tooltip content={<ChartTooltip metricUnit={metricDef.unit} />} cursor={{ stroke: "#9CF04A", strokeDasharray: "3 3" }} />
             {prevSeries && <Line dataKey="prevValue" name="Previous period" stroke="#626C7A" strokeWidth={1.5} strokeDasharray="5 4" dot={false} />}
             {showBars ? (
-              <Bar dataKey="value" name={metricDef.label} fill="#1578FF" radius={[3, 3, 0, 0]} maxBarSize={26} />
+              <Bar dataKey="value" name={metricDef.label} fill="#4C8F1C" radius={[3, 3, 0, 0]} maxBarSize={26} />
             ) : showArea ? (
-              <Area dataKey="value" name={metricDef.label} stroke="#39BDF8" strokeWidth={2.2} fill="#39BDF8" fillOpacity={0.18} type="monotone" />
+              <Area dataKey="value" name={metricDef.label} stroke="#9CF04A" strokeWidth={2.2} fill="#9CF04A" fillOpacity={0.18} type="monotone" />
             ) : (
-              <Line dataKey="value" name={metricDef.label} stroke="#39BDF8" strokeWidth={2.2} dot={false} type="monotone" />
+              <Line dataKey="value" name={metricDef.label} stroke="#9CF04A" strokeWidth={2.2} dot={false} type="monotone" />
             )}
           </ComposedChart>
         </ResponsiveContainer>

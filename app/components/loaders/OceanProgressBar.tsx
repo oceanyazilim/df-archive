@@ -34,7 +34,7 @@ export function OceanProgressBar({ progress, stageLabel, timeLabel, className }:
         {determinate ? (
           <div
             className="relative h-full rounded-full transition-[width] duration-300 ease-out"
-            style={{ width: `${pct}%`, backgroundImage: "linear-gradient(90deg, #1578FF, #39BDF8)" }}
+            style={{ width: `${pct}%`, backgroundImage: "linear-gradient(90deg, #4C8F1C, #9CF04A)" }}
           >
             <span
               className="absolute inset-y-0 left-0 w-1/3 animate-progress-highlight motion-reduce:animate-none"
@@ -45,7 +45,7 @@ export function OceanProgressBar({ progress, stageLabel, timeLabel, className }:
         ) : (
           <span
             className="absolute inset-y-0 w-1/3 animate-progress-highlight motion-reduce:animate-none motion-reduce:w-full motion-reduce:opacity-40"
-            style={{ backgroundImage: "linear-gradient(90deg, #1578FF, #39BDF8)", borderRadius: 999 }}
+            style={{ backgroundImage: "linear-gradient(90deg, #4C8F1C, #9CF04A)", borderRadius: 999 }}
             aria-hidden
           />
         )}

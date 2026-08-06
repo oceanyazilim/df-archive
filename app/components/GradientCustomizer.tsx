@@ -5,9 +5,11 @@ import { BgConfig, BG_DEFAULT, readBgConfig, writeBgConfig } from "./BackgroundF
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const PRESETS: { name: string; c1: string; c2: string }[] = [
-  { name: "Ocean", c1: "#00AEEF", c2: "#0047FF" },
-  { name: "Emerald", c1: "#20C997", c2: "#0B7285" },
-  { name: "Violet", c1: "#7048E8", c2: "#1864AB" },
+  // Virus (the brand pair) leads; the rest are alternatives, not the old
+  // ocean-blue defaults the app shipped before the rebrand.
+  { name: "Virus", c1: "#9CF04A", c2: "#4C8F1C" },
+  { name: "Toxic", c1: "#9CF04A", c2: "#A98BFF" },
+  { name: "Violet", c1: "#A98BFF", c2: "#5B2FBF" },
   { name: "Sunset", c1: "#E8590C", c2: "#862E9C" },
 ];
 

@@ -125,7 +125,9 @@ export function SpotifyUrlInput({ variant = "hero", onAnalyze, running, classNam
           whileTap={{ scale: 0.97 }}
           className={cn(
             "flex shrink-0 items-center gap-1.5 rounded-md font-medium text-[var(--on-accent)] transition-opacity disabled:opacity-40",
-            "bg-[linear-gradient(135deg,#39BDF8,#1578FF)] hover:brightness-110",
+            // Gradient built from the theme tokens — a hardcoded pair here kept
+            // the button ocean-blue after the Virus Records rebrand.
+            "bg-[linear-gradient(135deg,var(--accent),var(--accent-deep))] hover:brightness-110",
             isHero ? "h-10 px-4 text-sm" : "h-7 px-3 text-xs"
           )}
         >

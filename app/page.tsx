@@ -9,8 +9,12 @@ import { NavigationTransitionProvider, useNavigationTransition } from "./compone
 import { AdminProvider, useAdmin } from "./components/providers/AdminProvider";
 import { AdminLoginDialog } from "./components/shared/AdminLoginDialog";
 import { ActivationScreen } from "./components/license/ActivationScreen";
+import { WelcomeScreen } from "./components/dashboard/WelcomeScreen";
+import { VipDialog } from "./components/shared/VipDialog";
+import { recordAnalysis } from "./lib/localHistory";
+import { useAnalysisNav } from "./lib/analysisNav";
 import { useLicense } from "./lib/license";
-import { VIEW_TITLE } from "./components/layout/nav-config";
+import { ADMIN_ONLY_VIEWS, VIEW_TITLE, VIP_VIEWS } from "./components/layout/nav-config";
 import { FullscreenLoaderOverlay } from "./components/loaders/FullscreenLoaderOverlay";
 
 const INIT_SUBSTATUSES = ["Preparing workspace", "Loading interface", "Connecting services", "Preparing analyzer"];
@@ -29,6 +33,7 @@ import { BackgroundFX } from "./components/BackgroundFX";
 import { ReleaseWorkspace, Session } from "./components/LookupWorkspace";
 import type { ArtistCatalogData, PlaylistCatalogData } from "./components/ArtistCatalog";
 import { HistoryView } from "./components/views/HistoryView";
+import { CustomerAnalyticsView, CustomerHistoryView } from "./components/views/CustomerHistoryView";
 import { ArtistsView, AlbumsView, TracksView } from "./components/views/catalog";
 import { DistributorDatabasePage } from "./components/distributor/DistributorDatabasePage";
 import { AnalyticsView } from "./components/views/AnalyticsView";
@@ -40,7 +45,12 @@ import {
   ALBUM_ID_RE, synthReleaseFromWorkspace,
 } from "./lib/types";
 import { IdleHintMessage } from "./components/dashboard/IdleHintMessage";
+import { RecentAnalysesCard } from "./components/dashboard/RecentAnalysesCard";
 import { ANALYSIS_SEQUENCE, getAnalysisStatusConfig, stageBandProgress, type AnalysisKind, type AnalysisStatus } from "./lib/analysisState";
+
+/** Loaded artist / playlist catalogue state, shared with the nav stack. */
+type ArtistState = { loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null };
+type PlaylistState = { loading: boolean; data: PlaylistCatalogData | null; error: string | null; fetchedAt: string | null; playlistId: string | null };
 
 export default function Page() {
   return (
@@ -89,8 +99,8 @@ function PageInner() {
     });
   }, []);
   const [session, setSession] = useState<Session | null>(null);
-  const [artist, setArtist] = useState<{ loading: boolean; data: ArtistCatalogData | null; error: string | null; fetchedAt: string | null; artistId: string | null } | null>(null);
-  const [playlist, setPlaylist] = useState<{ loading: boolean; data: PlaylistCatalogData | null; error: string | null; fetchedAt: string | null; playlistId: string | null } | null>(null);
+  const [artist, setArtist] = useState<ArtistState | null>(null);
+  const [playlist, setPlaylist] = useState<PlaylistState | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<{ code?: string; message: string } | null>(null);
   const [analysisKind, setAnalysisKind] = useState<AnalysisKind>("release");
@@ -107,6 +117,11 @@ function PageInner() {
   const isAdminRef = useRef(false);
   isAdminRef.current = isAdmin;
   const [adminGate, setAdminGate] = useState(false);
+  const [vipFeature, setVipFeature] = useState<string | null>(null);
+  // The greeting is the customer entry point; the workspace opens after the
+  // first analysis, or when they skip it.
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const nav = useAnalysisNav<Session, ArtistState, PlaylistState>();
 
   useEffect(() => {
     const f = () => jget<Health>("/api/health").then((h) => { setHealth(h); setLastHealthAt(Date.now()); setAppReady(true); }).catch(() => {});
@@ -156,9 +171,32 @@ function PageInner() {
       .catch(() => {});
   }, []);
 
+  /**
+   * Record a finished analysis: it becomes a step in the session's
+   * back/forward stack and an entry in the customer's 7-day history.
+   */
+  const commitAnalysis = useCallback((
+    input: string,
+    label: string,
+    snapshot: { session: Session | null; artist: ArtistState | null; playlist: PlaylistState | null },
+    meta: { kind: "track" | "album" | "artist" | "playlist" | "unknown"; subtitle?: string | null; artworkUrl?: string | null; distributor?: string | null; ok?: boolean }
+  ) => {
+    nav.push({ input, label, ...snapshot });
+    recordAnalysis({
+      input,
+      kind: meta.kind,
+      title: label,
+      subtitle: meta.subtitle ?? null,
+      artworkUrl: meta.artworkUrl ?? null,
+      distributor: meta.distributor ?? null,
+      ok: meta.ok !== false,
+    });
+  }, [nav]);
+
   /** Global analyzer — one entry point for track/album URL, ISRC, or UUID. */
   const analyze = useCallback(async (input: string) => {
     setView("lookup");
+    setWorkspaceOpen(true);
     if (!input.trim()) return;
     const parsed = parseMusicLookupInput(input.trim());
     const kind: AnalysisKind = parsed.type === "spotify_artist" || parsed.type === "spotify_playlist" ? "artist" : "release";
@@ -183,7 +221,9 @@ function PageInner() {
         try {
           const cat = await jget<{ catalog?: PlaylistCatalogData; fetchedAt?: string; error?: { message: string } }>(`/api/playlist/${playlistId}/catalog`);
           if (!cat.catalog) throw new Error(cat.error?.message ?? "Playlist catalogue could not be built.");
-          setPlaylist({ loading: false, data: cat.catalog, error: null, fetchedAt: cat.fetchedAt ?? null, playlistId });
+          const next = { loading: false, data: cat.catalog, error: null, fetchedAt: cat.fetchedAt ?? null, playlistId };
+          setPlaylist(next);
+          commitAnalysis(input, cat.catalog.name ?? "Playlist", { session: null, artist: null, playlist: next }, { kind: "playlist", subtitle: cat.catalog.owner, artworkUrl: cat.catalog.imageUrl });
           await flashSuccess(false);
         } catch (e) {
           setPlaylist({ loading: false, data: null, error: (e as Error).message, fetchedAt: null, playlistId });
@@ -213,7 +253,9 @@ function PageInner() {
         try {
           const cat = await jget<{ catalog?: ArtistCatalogData; fetchedAt?: string; error?: { message: string } }>(`/api/artist/${artistId}/catalog`);
           if (!cat.catalog) throw new Error(cat.error?.message ?? "Artist catalogue could not be built.");
-          setArtist({ loading: false, data: cat.catalog, error: null, fetchedAt: cat.fetchedAt ?? null, artistId });
+          const next = { loading: false, data: cat.catalog, error: null, fetchedAt: cat.fetchedAt ?? null, artistId };
+          setArtist(next);
+          commitAnalysis(input, cat.catalog.name ?? "Artist", { session: null, artist: next, playlist: null }, { kind: "artist", subtitle: `${cat.catalog.counts.total} tracks`, artworkUrl: cat.catalog.imageUrl });
           await flashSuccess(false);
         } catch (e) {
           setArtist({ loading: false, data: null, error: (e as Error).message, fetchedAt: null, artistId });
@@ -226,7 +268,9 @@ function PageInner() {
         if (!release.tracks.length) { setError({ message: "This release has no tracks." }); return; }
         setArtist(null);
         setPlaylist(null);
-        setSession({ release, initialTrackId: release.tracks[0].spotifyTrackId, seed: null });
+        const next = { release, initialTrackId: release.tracks[0].spotifyTrackId, seed: null };
+        setSession(next);
+        commitAnalysis(input, release.title, { session: next, artist: null, playlist: null }, { kind: "album", subtitle: release.artists.join(", "), artworkUrl: release.artworkUrl ?? null });
         await flashSuccess(false);
         return;
       }
@@ -244,13 +288,29 @@ function PageInner() {
           const alb = await jget<{ kind?: string; release?: AlbumRelease }>(`/api/album/${albumId}`);
           if (alb.kind === "album" && alb.release && alb.release.tracks.length) {
             const initial = alb.release.tracks.some((t) => t.spotifyTrackId === trackId) ? trackId : alb.release.tracks[0].spotifyTrackId;
-            setSession({ release: alb.release, initialTrackId: initial, seed });
+            const next = { release: alb.release, initialTrackId: initial, seed };
+            setSession(next);
+            commitAnalysis(input, ws.metadata.trackTitle ?? alb.release.title, { session: next, artist: null, playlist: null }, {
+              kind: "track",
+              subtitle: (ws.metadata.artists ?? []).join(", ") || alb.release.artists.join(", "),
+              artworkUrl: alb.release.artworkUrl ?? null,
+              distributor: ws.distributor?.name ?? null,
+              ok: !hadWarnings,
+            });
             await flashSuccess(hadWarnings);
             return;
           }
         } catch { /* fall through to a synthetic single-track release */ }
       }
-      setSession({ release: synthReleaseFromWorkspace(ws), initialTrackId: trackId, seed });
+      const synth = { release: synthReleaseFromWorkspace(ws), initialTrackId: trackId, seed };
+      setSession(synth);
+      commitAnalysis(input, ws.metadata.trackTitle ?? "Track", { session: synth, artist: null, playlist: null }, {
+        kind: "track",
+        subtitle: (ws.metadata.artists ?? []).join(", "),
+        artworkUrl: ws.metadata.artworkUrl ?? null,
+        distributor: ws.distributor?.name ?? null,
+        ok: !hadWarnings,
+      });
       await flashSuccess(hadWarnings);
     } catch (e) { setError({ message: (e as Error).message }); }
     finally { clearInterval(ticker); setRunning(false); }
@@ -262,15 +322,28 @@ function PageInner() {
       setAnalysisStatus(partial ? "partial-success" : "success");
       await new Promise((resolve) => setTimeout(resolve, 650));
     }
-  }, []);
+  }, [commitAnalysis]);
 
   analyzeRef.current = analyze;
 
+  /** Restore a stack entry — no provider calls, the snapshot is complete. */
+  const applySnapshot = useCallback((e: { session: Session | null; artist: ArtistState | null; playlist: PlaylistState | null }) => {
+    setView("lookup");
+    setError(null);
+    setSession(e.session);
+    setArtist(e.artist);
+    setPlaylist(e.playlist);
+  }, []);
+
   const { beginTransition, markReady } = useNavigationTransition();
   const go = useCallback((v: View) => {
+    // A customer can never land on an operator view, whatever route they take.
+    if (!isAdminRef.current && ADMIN_ONLY_VIEWS.includes(v)) return;
+    if (!isAdminRef.current && VIP_VIEWS.includes(v)) { setVipFeature(VIEW_TITLE[v]); return; }
     if (v !== view) beginTransition(VIEW_TITLE[v]);
     setView(v);
     setDrawer(false);
+    setWorkspaceOpen(true);
   }, [view, beginTransition]);
   const openAnalyzer = useCallback((target: AnalyzerTarget) => { setAnalyzerTarget(target); go("analyzer"); }, [go]);
 
@@ -278,6 +351,29 @@ function PageInner() {
   // the new view has painted, closing the transition loader (or canceling its
   // pending show entirely if the switch was faster than the flash-guard delay).
   useEffect(() => { markReady(); }, [view, markReady]);
+
+  // The greeting owns the first screen for customers; admins go straight to
+  // the workspace they operate all day.
+  const showWelcome = !isAdmin && !workspaceOpen && !session && !artist && !playlist;
+  if (appReady && showWelcome) {
+    return (
+      <MotionConfig reducedMotion="user">
+        <TooltipProvider>
+          <div className="relative min-h-screen bg-background">
+            <BackgroundFX />
+            <WelcomeScreen onAnalyze={analyze} onSkip={() => setWorkspaceOpen(true)} running={running} />
+            {error && !running && (
+              <div className="pointer-events-none fixed inset-x-0 bottom-8 flex justify-center px-5">
+                <div className="pointer-events-auto max-w-lg rounded-md border border-danger/30 bg-card px-4 py-3 text-[12.5px] text-foreground-secondary">
+                  {describeError(error.code, error.message).message}
+                </div>
+              </div>
+            )}
+          </div>
+        </TooltipProvider>
+      </MotionConfig>
+    );
+  }
 
   return (
     <MotionConfig reducedMotion="user">
@@ -299,6 +395,7 @@ function PageInner() {
           drawerOpen={drawer}
           health={health}
           lastHealthAt={lastHealthAt}
+          onLocked={setVipFeature}
         />
 
         <div className={`relative flex min-h-screen flex-col ml-0 transition-[margin] duration-base ease-out ${collapsed ? "lg:ml-[72px]" : "lg:ml-[264px]"}`}>
@@ -308,6 +405,13 @@ function PageInner() {
             onAnalyze={analyze}
             running={running}
             health={health}
+            canGoBack={nav.canGoBack}
+            canGoForward={nav.canGoForward}
+            onBack={() => nav.step(-1, applySnapshot)}
+            onForward={() => nav.step(1, applySnapshot)}
+            backLabel={nav.backLabel}
+            forwardLabel={nav.forwardLabel}
+            hideSearch={view === "lookup" && !session && !artist && !playlist}
           />
           <PageContainer key={view}>
             {health?.spotifyCooldown?.active && <SpotifyCooldownBanner ms={health.spotifyCooldown.remainingMs} />}
@@ -320,13 +424,14 @@ function PageInner() {
                   onOpenAnalyzer={openAnalyzer}
                 />
               )}
-              {view === "history" && <HistoryView onAnalyze={analyze} />}
+              {/* Operators see every query the tool ran; customers see their own 7-day history. */}
+              {view === "history" && (isAdmin ? <HistoryView onAnalyze={analyze} /> : <CustomerHistoryView onAnalyze={analyze} />)}
               {view === "uuid" && <UuidDirectoryView />}
               {view === "distributors" && <DistributorDatabasePage />}
               {view === "artists" && <ArtistsView />}
               {view === "albums" && <AlbumsView onAnalyze={analyze} />}
               {view === "tracks" && <TracksView onAnalyze={analyze} />}
-              {view === "analytics" && <AnalyticsView onAnalyze={analyze} />}
+              {view === "analytics" && (isAdmin ? <AnalyticsView onAnalyze={analyze} /> : <CustomerAnalyticsView onAnalyze={analyze} />)}
               {view === "reports" && <ReportsView />}
               {view === "analyzer" && <OceanAnalyzerPage initialTarget={analyzerTarget} />}
               {view === "status" && <SystemStatusView health={health} />}
@@ -336,6 +441,7 @@ function PageInner() {
         </div>
         {toast && <div className="toast anim-pop">{toast}</div>}
         <AdminLoginDialog open={adminGate} onOpenChange={setAdminGate} />
+        <VipDialog open={!!vipFeature} onOpenChange={(o) => !o && setVipFeature(null)} feature={vipFeature} />
       </div>
     </TooltipProvider>
     </MotionConfig>
@@ -491,7 +597,10 @@ function LookupView({ session, artist, playlist, running, analysisStatus, analys
             })()}
           </div>
         ) : (
-          <IdleHintMessage className="mx-auto mt-6 max-w-md" />
+          <>
+            <RecentAnalysesCard className="mx-auto mt-8 max-w-2xl" onAnalyze={onAnalyze} onOpenAll={onOpenHistory} />
+            <IdleHintMessage className="mx-auto mt-6 max-w-md" />
+          </>
         )}
       </>
     );

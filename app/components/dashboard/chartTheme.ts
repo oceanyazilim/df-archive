@@ -1,6 +1,6 @@
 /** Shared Recharts theming so every chart in the app reads as one system. */
 
-export const CHART_COLORS = ["#39BDF8", "#1578FF", "#8B7CFF", "#36D67E", "#F5B94C", "#FF647C"];
+export const CHART_COLORS = ["#9CF04A", "#4C8F1C", "#A98BFF", "#4ADE80", "#F5B94C", "#FF6B7E"];
 
 export const chartGrid = { stroke: "rgba(255,255,255,0.07)", vertical: false };
 export const chartAxis = {

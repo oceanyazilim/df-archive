@@ -19,12 +19,18 @@ export interface AppSidebarProps {
   drawerOpen: boolean;
   health: Health | null;
   lastHealthAt: number | null;
+  /** A customer clicked a VIP-locked section. */
+  onLocked: (label: string) => void;
 }
 
-export function AppSidebar({ view, onNavigate, collapsed, onToggleCollapsed, drawerOpen, health, lastHealthAt }: AppSidebarProps) {
+export function AppSidebar({ view, onNavigate, collapsed, onToggleCollapsed, drawerOpen, health, lastHealthAt, onLocked }: AppSidebarProps) {
   const reduced = useReducedMotion();
   const isAdmin = useIsAdmin();
-  const nav = NAV.map((group) => ({ ...group, items: group.items.filter((item) => !item.adminOnly || isAdmin) })).filter((group) => group.items.length > 0);
+  // Customers never see operator tools; VIP items stay visible but locked, so
+  // they can tell what the plan adds instead of guessing.
+  const nav = NAV
+    .map((group) => ({ ...group, items: group.items.filter((item) => item.access !== "admin" || isAdmin) }))
+    .filter((group) => group.items.length > 0);
   return (
     <motion.aside
       animate={{ width: collapsed ? 72 : 264 }}
@@ -62,21 +68,27 @@ export function AppSidebar({ view, onNavigate, collapsed, onToggleCollapsed, dra
               </div>
             )}
             <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <NavItem
-                  key={`${group.section}-${item.label}`}
-                  item={item}
-                  active={view === item.view}
-                  collapsed={collapsed}
-                  onClick={() => onNavigate(item.view)}
-                />
-              ))}
+              {group.items.map((item) => {
+                const locked = item.access === "vip" && !isAdmin;
+                return (
+                  <NavItem
+                    key={`${group.section}-${item.label}`}
+                    item={item}
+                    active={view === item.view}
+                    collapsed={collapsed}
+                    locked={locked}
+                    onClick={() => (locked ? onLocked(item.label) : onNavigate(item.view))}
+                  />
+                );
+              })}
             </div>
           </div>
         ))}
       </nav>
 
-      <SystemStatusCard health={health} lastHealthAt={lastHealthAt} collapsed={collapsed} />
+      {/* Service diagnostics are an operator concern — a customer only needs
+          to know the app works, and it tells them when it does not. */}
+      {isAdmin && <SystemStatusCard health={health} lastHealthAt={lastHealthAt} collapsed={collapsed} />}
       <UserMenu collapsed={collapsed} onNavigate={onNavigate} />
     </motion.aside>
   );

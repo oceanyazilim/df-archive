@@ -13,7 +13,7 @@ export type BgConfig = { enabled: boolean; c1: string; c2: string };
 
 export const BG_STORAGE_KEY = "odf-bg";
 export const BG_EVENT = "odf-bg-change";
-export const BG_DEFAULT: BgConfig = { enabled: false, c1: "#00AEEF", c2: "#0047FF" };
+export const BG_DEFAULT: BgConfig = { enabled: false, c1: "#9CF04A", c2: "#4C8F1C" };
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 

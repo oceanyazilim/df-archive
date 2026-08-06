@@ -18,14 +18,13 @@ export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavi
   return (
     <div className={cn("flex items-center gap-2.5 border-t border-border-subtle px-3 py-3", collapsed && "justify-center px-0")}>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border-strong bg-gradient-to-br from-accent to-accent-secondary text-[11px] font-bold text-[var(--on-accent)]">
-        OD
+        VR
       </div>
       {!collapsed && (
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12.5px] font-medium text-foreground">Virus Records</div>
           <div className="flex items-center gap-1.5 text-[11px] text-foreground-muted">
-            <span className="truncate">Local workspace</span>
-            <span className="shrink-0 rounded-full border border-border-strong bg-card-elevated px-1.5 py-px text-[9.5px] font-medium">Analyzer v4</span>
+            <span className="truncate">{isAdmin ? "Administrator" : "Customer"}</span>
           </div>
         </div>
       )}
@@ -52,16 +51,22 @@ export function UserMenu({ collapsed, onNavigate }: { collapsed: boolean; onNavi
                   <Settings2 className="size-4" aria-hidden /> Settings
                 </button>
               </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <button className={menuItemClass} onClick={() => onNavigate("status")}>
-                  <HeartPulse className="size-4" aria-hidden /> API status
-                </button>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <button className={menuItemClass} onClick={() => onNavigate("reports")}>
-                  <Download className="size-4" aria-hidden /> Export center
-                </button>
-              </DropdownMenu.Item>
+              {/* Operator tools stay out of a customer's menu, exactly as they
+                  are kept out of the sidebar. */}
+              {isAdmin && (
+                <>
+                  <DropdownMenu.Item asChild>
+                    <button className={menuItemClass} onClick={() => onNavigate("status")}>
+                      <HeartPulse className="size-4" aria-hidden /> API status
+                    </button>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <button className={menuItemClass} onClick={() => onNavigate("reports")}>
+                      <Download className="size-4" aria-hidden /> Export center
+                    </button>
+                  </DropdownMenu.Item>
+                </>
+              )}
               <DropdownMenu.Separator className="my-1 h-px bg-border-subtle" />
               {isAdmin ? (
                 <DropdownMenu.Item asChild>

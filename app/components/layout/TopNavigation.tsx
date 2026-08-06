@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { Bell, Maximize, Menu, Minimize } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, Maximize, Menu, Minimize } from "lucide-react";
 import { cn } from "../../lib/cn";
 import type { Health, View } from "../../lib/types";
 import { overallStatus } from "../../lib/types";
+import { useIsAdmin } from "../providers/AdminProvider";
 import { IconButton } from "../shared/IconButton";
 import { EmptyState } from "../shared/EmptyState";
 import { HeaderAnalyzeInput } from "./HeaderAnalyzeInput";
@@ -17,6 +18,15 @@ export interface TopNavigationProps {
   onAnalyze: (input: string) => void;
   running: boolean;
   health: Health | null;
+  /** Step through previously analyzed items. */
+  canGoBack: boolean;
+  canGoForward: boolean;
+  onBack: () => void;
+  onForward: () => void;
+  backLabel: string | null;
+  forwardLabel: string | null;
+  /** Hide the header search when the page already shows a primary one. */
+  hideSearch?: boolean;
 }
 
 function useFullscreen() {
@@ -31,34 +41,65 @@ function useFullscreen() {
   return { fs, toggle };
 }
 
-export function TopNavigation({ view, onToggleSidebar, onAnalyze, running, health }: TopNavigationProps) {
+export function TopNavigation({
+  view, onToggleSidebar, onAnalyze, running, health,
+  canGoBack, canGoForward, onBack, onForward, backLabel, forwardLabel, hideSearch,
+}: TopNavigationProps) {
   const st = overallStatus(health);
   const { fs, toggle } = useFullscreen();
+  const isAdmin = useIsAdmin();
 
   return (
     <header className="sticky top-0 z-topbar flex h-header shrink-0 items-center gap-3 border-b border-border-subtle bg-header px-4 backdrop-blur-md sm:px-6">
       <IconButton label="Toggle sidebar" icon={<Menu className="size-4" aria-hidden />} variant="ghost" size="lg" onClick={onToggleSidebar} className="lg:size-8" />
+
+      {/* Step back and forward through the analyses of this session. Both stay
+          mounted (disabled) so the header never shifts as they light up. */}
+      <div className="flex shrink-0 items-center gap-0.5">
+        <IconButton
+          label={backLabel ? `Back to ${backLabel}` : "Back"}
+          icon={<ArrowLeft className="size-4" aria-hidden />}
+          variant="ghost"
+          onClick={onBack}
+          disabled={!canGoBack}
+          title={backLabel ? `Back to ${backLabel}` : undefined}
+        />
+        <IconButton
+          label={forwardLabel ? `Forward to ${forwardLabel}` : "Forward"}
+          icon={<ArrowRight className="size-4" aria-hidden />}
+          variant="ghost"
+          onClick={onForward}
+          disabled={!canGoForward}
+          title={forwardLabel ? `Forward to ${forwardLabel}` : undefined}
+        />
+      </div>
 
       <div className="min-w-0 shrink-0">
         <nav aria-label="Breadcrumb" className="text-[10.5px] text-foreground-muted">{VIEW_SECTION[view]}</nav>
         <h1 className="truncate text-[15px] font-semibold leading-tight text-foreground">{VIEW_TITLE[view]}</h1>
       </div>
 
+      {/* The dashboard's own hero input is the primary field; showing a second
+          one in the header at the same time is redundant. */}
       <div className="flex flex-1 justify-center px-2">
-        <HeaderAnalyzeInput onAnalyze={onAnalyze} running={running} />
+        {!hideSearch && <HeaderAnalyzeInput onAnalyze={onAnalyze} running={running} />}
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <span
-          className={cn(
-            "hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium md:inline-flex",
-            st.cls === "ok" ? "border-success/25 bg-success/10 text-success" : "border-warning/25 bg-warning/10 text-warning"
-          )}
-          title="Overall system status"
-        >
-          <span className={cn("size-1.5 rounded-full bg-current")} aria-hidden />
-          {st.label}
-        </span>
+        {/* Service status is operator information; a customer sees errors where
+            they happen instead of a permanent green badge. */}
+        {isAdmin && (
+          <span
+            className={cn(
+              "hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium md:inline-flex",
+              st.cls === "ok" ? "border-success/25 bg-success/10 text-success" : "border-warning/25 bg-warning/10 text-warning"
+            )}
+            title="Overall system status"
+          >
+            <span className={cn("size-1.5 rounded-full bg-current")} aria-hidden />
+            {st.label}
+          </span>
+        )}
 
         <PopoverPrimitive.Root>
           <PopoverPrimitive.Trigger asChild>

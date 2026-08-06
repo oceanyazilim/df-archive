@@ -10,6 +10,7 @@ import { SkeletonStatCard } from "../shared/Skeleton";
 import { EmptyState as NewEmptyState } from "../shared/EmptyState";
 import { StatusBadge, type StatusBadgeProps } from "../shared/StatusBadge";
 import { CensoredValue } from "../shared/CensoredValue";
+import { CopyButton } from "../shared/CopyButton";
 import { useIsAdmin } from "../providers/AdminProvider";
 import { Panel } from "../shared/Card";
 import { Button } from "../shared/Button";
@@ -114,6 +115,7 @@ export function SystemStatusView({ health }: { health: Health | null }) {
 
 // ---------------- Settings ----------------
 export function SettingsView({ health }: { health: Health | null }) {
+  const isAdmin = useIsAdmin();
   return (
     <div className="space-y-5">
       <NewPageHead title="Settings" description="Appearance, the Spotify connector, and application information." />
@@ -123,7 +125,9 @@ export function SettingsView({ health }: { health: Health | null }) {
       <LicenseSettings />
       <ConnectorSettings />
       <SpotifyAccountSettings />
-      <CredentialPools health={health} />
+      {/* Customers see their allowance; the credential pool itself (slots,
+          fingerprints, cooldowns) is operator information. */}
+      {isAdmin ? <CredentialPools health={health} /> : <CustomerQuotas />}
       <Panel title="Application">
         <div className="divide-y divide-border-subtle">
           <Row k="Name" v="Virus Records — Distro Finder" />
@@ -136,6 +140,39 @@ export function SettingsView({ health }: { health: Health | null }) {
         </div>
       </Panel>
     </div>
+  );
+}
+
+/**
+ * What a customer is allowed to use. Deliberately not the credential pool:
+ * these are plan allowances, not the operator's key health.
+ */
+function CustomerQuotas() {
+  const QUOTAS = [
+    { name: "Spotify", limit: 10000, period: "requests", note: "Track, release and playlist metadata" },
+    { name: "Ocean Analyze", limit: 10000, period: "requests per month", note: "Streaming history and audience analytics" },
+  ];
+  return (
+    <Panel title="API Credentials" description="Included with your plan. Nothing to configure — the app uses these automatically.">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {QUOTAS.map((q) => (
+          <div key={q.name} className="rounded-md border border-border-strong bg-card-elevated p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] font-medium text-foreground">{q.name}</span>
+              <StatusBadge tone="success">Active</StatusBadge>
+            </div>
+            <div className="mt-2 text-[24px] font-semibold leading-none tabular-nums text-foreground">
+              {q.limit.toLocaleString()}
+            </div>
+            <div className="mt-1 text-[11.5px] text-foreground-muted">{q.period}</div>
+            <p className="mt-2 text-[11.5px] text-foreground-secondary">{q.note}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-[11.5px] text-foreground-muted">
+        Need more? Contact the administrator about the VIP plan.
+      </p>
+    </Panel>
   );
 }
 
@@ -321,6 +358,7 @@ type SpotifyAccountState = {
     email: string | null; spotifyUrl: string | null;
   } | null;
   connectedAt: string | null;
+  setup?: { configured: boolean; clientIdHint: string | null; redirectUri: string };
 };
 
 /**
@@ -330,6 +368,7 @@ type SpotifyAccountState = {
  * reach the browser.
  */
 function SpotifyAccountSettings() {
+  const isAdmin = useIsAdmin();
   const [st, setSt] = useState<SpotifyAccountState | null>(null);
   const [waiting, setWaiting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -456,6 +495,38 @@ function SpotifyAccountSettings() {
         )}
       </div>
       {msg && <p className="mt-2 text-xs text-foreground-muted">{msg}</p>}
+
+      {/* Connecting fails for exactly two reasons in practice: the redirect URI
+          is not registered on the Spotify app, or the account is not on that
+          app's allowlist. Show both instead of a generic error. */}
+      {isAdmin && st?.setup && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[11.5px] text-foreground-muted hover:text-foreground">
+            Authorization not working? Check these two things
+          </summary>
+          <div className="mt-2 space-y-2.5 rounded-md border border-border-strong bg-card-elevated p-3 text-[11.5px] text-foreground-secondary">
+            <div>
+              <div className="font-medium text-foreground">1 · Register this exact redirect URI</div>
+              <div className="mt-1 flex items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-sm bg-input px-2 py-1 font-mono text-[11px] text-foreground">{st.setup.redirectUri}</code>
+                <CopyButton value={st.setup.redirectUri} label="" />
+              </div>
+              <p className="mt-1">
+                developer.spotify.com → your app → Settings → Redirect URIs. It must match character for character.
+                {st.setup.clientIdHint ? ` This installation uses client ${st.setup.clientIdHint}.` : " No client id is configured."}
+              </p>
+            </div>
+            <div>
+              <div className="font-medium text-foreground">2 · Development-mode apps have a 25-user allowlist</div>
+              <p className="mt-1">
+                While the Spotify app is in Development Mode, only accounts added under <b>User Management</b> can
+                authorize — everyone else is refused after logging in. To let any customer connect, request{" "}
+                <b>Extended Quota Mode</b> from Spotify.
+              </p>
+            </div>
+          </div>
+        </details>
+      )}
     </Panel>
   );
 }

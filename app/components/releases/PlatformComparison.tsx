@@ -32,7 +32,7 @@ function Sparkline({ points }: { points: StreamPoint[] }) {
     <div className="h-11 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 3, right: 3, bottom: 3, left: 3 }}>
-          <Line type="monotone" dataKey="value" stroke="#39BDF8" strokeWidth={1.8} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="value" stroke="#9CF04A" strokeWidth={1.8} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
