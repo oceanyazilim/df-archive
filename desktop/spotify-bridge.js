@@ -99,6 +99,15 @@ try {
   });
 }
 
+/** Force-stop Spotify (used before patching its app files on disk). */
+function killSpotify() {
+  return new Promise((resolve) => {
+    const k = spawn("taskkill", ["/F", "/IM", "Spotify.exe"], { windowsHide: true });
+    k.on("exit", () => resolve(true));
+    k.on("error", () => resolve(false));
+  });
+}
+
 /** Restart Spotify with the debugging port enabled. Resolves once reachable. */
 async function launch({ restart = true } = {}) {
   if (await isConnected()) return { ok: true, alreadyRunning: true };
@@ -303,6 +312,6 @@ async function writeAnalyzerResponse(requestId, payload) {
 }
 
 module.exports = {
-  isConnected, isSpotifyRunning, launch, patchLaunchEntries, fetchTrackProtobuf, spotifyExe, PORT,
+  isConnected, isSpotifyRunning, launch, killSpotify, patchLaunchEntries, fetchTrackProtobuf, spotifyExe, PORT,
   readAnalyzerRequest, writeAnalyzerResponse,
 };

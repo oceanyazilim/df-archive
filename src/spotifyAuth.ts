@@ -24,6 +24,7 @@
 import { SPOTIFY } from "./config";
 import { CredentialPool, PoolStatus, PoolUnavailableError, loadCredentialsFromEnv } from "./credentialPool";
 import { acquireSpotifySlot } from "./spotifyRateGuard";
+import { userSpotifyRequest } from "./spotifyAccount";
 import { logger, maskSecret } from "./logger";
 
 let pool: CredentialPool | null = null;
@@ -64,6 +65,34 @@ export type SpotifyCall = { status: number; body: Record<string, unknown>; heade
  */
 export async function spotifyRequest(url: string, signal?: AbortSignal): Promise<SpotifyCall> {
   const p = getSpotifyPool();
+
+  // No usable app key (none configured, or every slot parked/disabled)?
+  // A linked Spotify account can carry the request on its own authorization —
+  // this is what lets an installed copy work with zero bundled keys.
+  const runViaAccount = async (): Promise<SpotifyCall | null> => {
+    await acquireSpotifySlot();
+    return userSpotifyRequest(url, signal);
+  };
+  if (!p.configured) {
+    const viaUser = await runViaAccount();
+    if (viaUser) return viaUser;
+  }
+
+  try {
+    return await poolRequest(p, url, signal);
+  } catch (err) {
+    if (err instanceof PoolUnavailableError) {
+      const viaUser = await runViaAccount();
+      if (viaUser) {
+        logger.info({ event: "spotify_account_fallback_used" });
+        return viaUser;
+      }
+    }
+    throw err;
+  }
+}
+
+async function poolRequest(p: CredentialPool, url: string, signal?: AbortSignal): Promise<SpotifyCall> {
   return p.run(async (handle) => {
     // Per-process pacing still applies: failover is a safety net, not a licence
     // to burn every app's quota at once.

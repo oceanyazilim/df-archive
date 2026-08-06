@@ -2,8 +2,8 @@
 
 /** System views: UUID Directory, System Status, Settings (theme, background, connector). */
 
-import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, Search, Wifi } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Music2, RefreshCw, Search, Wifi } from "lucide-react";
 import { PageHead as NewPageHead } from "../shared/PageHead";
 import { StatCard } from "../shared/StatCard";
 import { SkeletonStatCard } from "../shared/Skeleton";
@@ -120,6 +120,7 @@ export function SettingsView({ health }: { health: Health | null }) {
         <GradientCustomizer />
       </Panel>
       <ConnectorSettings />
+      <SpotifyAccountSettings />
       <CredentialPools health={health} />
       <Panel title="Application">
         <div className="divide-y divide-border-subtle">
@@ -244,6 +245,119 @@ function CredentialPools({ health }: { health: Health | null }) {
         rotates to the next one automatically when a key is throttled or rejected. Client ids are masked and secrets are shown
         only as their last 4 characters — full keys are never displayed, logged, or returned by the API.
       </p>
+    </Panel>
+  );
+}
+
+type SpotifyAccountState = {
+  connected: boolean;
+  needsReauth: boolean;
+  profile: { id: string; displayName: string | null; avatarUrl: string | null } | null;
+  connectedAt: string | null;
+};
+
+/**
+ * Link the user's own Spotify account (OAuth Authorization Code + PKCE).
+ * Consent happens on accounts.spotify.com in the user's browser — this panel
+ * only opens the flow and reflects the backend-verified result. Tokens never
+ * reach the browser.
+ */
+function SpotifyAccountSettings() {
+  const [st, setSt] = useState<SpotifyAccountState | null>(null);
+  const [waiting, setWaiting] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const waitTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const refresh = useCallback(async (): Promise<SpotifyAccountState | null> => {
+    try {
+      const r = await fetch("/api/spotify-auth/status");
+      if (!r.ok) return null;
+      const j = (await r.json()) as SpotifyAccountState;
+      setSt(j);
+      return j;
+    } catch { return null; }
+  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => () => { if (waitTimer.current) clearInterval(waitTimer.current); }, []);
+
+  const connect = () => {
+    setMsg(null);
+    // Opens the consent page. Inside the desktop app this lands in the user's
+    // default browser; in a normal browser it is just a new tab.
+    window.open("/api/spotify-auth/login", "_blank", "noopener");
+    setWaiting(true);
+    const deadline = Date.now() + 5 * 60 * 1000;
+    if (waitTimer.current) clearInterval(waitTimer.current);
+    waitTimer.current = setInterval(async () => {
+      const j = await refresh();
+      if (j?.connected && !j.needsReauth) {
+        setWaiting(false); setMsg(null);
+        if (waitTimer.current) clearInterval(waitTimer.current);
+      } else if (Date.now() > deadline) {
+        setWaiting(false);
+        setMsg("No authorization arrived — finish the Spotify page in your browser, then check again.");
+        if (waitTimer.current) clearInterval(waitTimer.current);
+      }
+    }, 2500);
+  };
+
+  const disconnect = async () => {
+    setMsg(null);
+    try { await fetch("/api/spotify-auth/disconnect", { method: "POST" }); } catch { /* status refresh tells the truth */ }
+    refresh();
+  };
+
+  const connected = !!st?.connected && !st?.needsReauth;
+
+  return (
+    <Panel title="Spotify Account" description="Optional — connect your own Spotify account with your explicit consent on Spotify's official page. The app never sees your password, and you can revoke access any time at spotify.com/account/apps.">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-[13px] text-foreground-secondary"><Music2 className="size-3.5" aria-hidden /> Account</span>
+        {st === null ? (
+          <StatusBadge tone="neutral">Checking…</StatusBadge>
+        ) : connected ? (
+          <StatusBadge tone="success">Connected</StatusBadge>
+        ) : st.needsReauth ? (
+          <StatusBadge tone="warning">Authorization expired</StatusBadge>
+        ) : (
+          <StatusBadge tone="neutral">Not connected</StatusBadge>
+        )}
+      </div>
+
+      {connected && st?.profile && (
+        <div className="mt-3 flex items-center gap-3">
+          {st.profile.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={st.profile.avatarUrl} alt="" className="size-9 rounded-full border border-border-strong object-cover" />
+          ) : (
+            <div className="grid size-9 place-items-center rounded-full border border-border-strong bg-card-elevated text-[13px] font-semibold text-foreground-secondary">
+              {(st.profile.displayName ?? st.profile.id).slice(0, 1).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-medium text-foreground">{st.profile.displayName ?? st.profile.id}</div>
+            <div className="text-[11.5px] text-foreground-muted">
+              Connected {st.connectedAt ? new Date(st.connectedAt).toLocaleDateString() : ""} · used automatically when no API key is available
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center gap-2">
+        {connected ? (
+          <Button variant="secondary" size="sm" onClick={disconnect}>Disconnect</Button>
+        ) : (
+          <Button variant="primary" size="sm" loading={waiting} onClick={connect}>
+            {waiting ? "Waiting for Spotify…" : st?.needsReauth ? "Reconnect Spotify account" : "Connect Spotify account"}
+          </Button>
+        )}
+        {waiting && (
+          <Button variant="secondary" size="sm" onClick={() => { setWaiting(false); if (waitTimer.current) clearInterval(waitTimer.current); }}>
+            Cancel
+          </Button>
+        )}
+      </div>
+      {msg && <p className="mt-2 text-xs text-foreground-muted">{msg}</p>}
     </Panel>
   );
 }

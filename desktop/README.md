@@ -75,6 +75,15 @@ companion by itself.
 - No env vars are required for distributor lookup. Soundcharts/Spotify API keys
   (for analytics views) are picked up from `.env*` files copied into the bundle
   by `prepare.mjs`, or from the process environment.
-- Spicetify survives most Spotify updates but occasionally needs
-  `spicetify restore backup apply` after a client update — just re-run
-  `npm run spicetify:install`.
+- Spotify self-updates wipe the Spicetify patch (the right-click panel and the
+  in-Spotify analyzer vanish). The desktop shell detects this automatically
+  (companion watchdog: `xpui.spa` reappearing / the extension file missing) and
+  silently reinstalls the companion, then relaunches Spotify with the app link.
+  Manual fallback: `npm run spicetify:install` (the installer now recovers from
+  the version-mismatch state by itself).
+- Optional Spotify account link (Settings → Spotify Account): OAuth
+  Authorization Code + PKCE against the public client id. Requires the redirect
+  URI `http://127.0.0.1:3000/api/spotify-auth/callback` to be registered on the
+  app in developer.spotify.com. Tokens live in the Electron user-data dir
+  (`spotify-account.json`) and are used as a Web API fallback when no pool key
+  is usable — an installed copy with zero bundled keys works after one consent.

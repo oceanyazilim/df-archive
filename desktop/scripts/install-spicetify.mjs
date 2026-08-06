@@ -2,7 +2,7 @@
 // Spotify desktop client via Spicetify. Used both from the CLI and from the
 // desktop app's "Install Spotify companion" menu (same implementation).
 //
-//   node desktop/scripts/install-spicetify.mjs [--mapping path/to/uuid's.json] [--source path/to/distro-finder.js]
+//   node desktop/scripts/install-spicetify.mjs [--mapping path/to/uuid's.json] [--source path/to/distro-finder.js] [--no-restart]
 //
 // The Spotify renderer cannot reach a localhost backend by any channel, so the
 // canonical UUID→distributor mapping is EMBEDDED into the extension at install
@@ -19,6 +19,9 @@ function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
+// --no-restart: patch without touching the running Spotify process. The caller
+// (the desktop shell's auto-repair) decides when a restart is appropriate.
+const noRestart = process.argv.includes("--no-restart");
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = path.resolve(arg("source", path.join(here, "..", "..", "spicetify", "distro-finder.js")));
@@ -99,12 +102,32 @@ console.log(
   (conflicts ? ` (${conflicts} conflicting UUID(s) excluded)` : "")
 );
 
-for (const args of [["config", "extensions", "distro-finder.js"], ["apply"]]) {
+function run(args) {
   const r = spicetify(args);
   process.stdout.write(r.stdout || "");
   process.stderr.write(r.stderr || "");
-  if (r.status !== 0) {
-    console.error(`\n\`spicetify ${args.join(" ")}\` failed (exit ${r.status}).`);
+  return r;
+}
+
+const applyArgs = noRestart ? ["-n", "apply"] : ["apply"];
+const cfg = run(["config", "extensions", "distro-finder.js"]);
+if (cfg.status !== 0) {
+  console.error(`\n\`spicetify config extensions distro-finder.js\` failed (exit ${cfg.status}).`);
+  process.exit(1);
+}
+let applied = run(applyArgs);
+if (applied.status !== 0) {
+  // A Spotify self-update rewrites the client and invalidates the old backup;
+  // spicetify then refuses a plain `apply`. `backup apply` re-backups the
+  // fresh (unpatched) client and applies in one go — recover automatically
+  // instead of asking the user to run CLI commands.
+  const out = `${applied.stdout || ""}${applied.stderr || ""}`;
+  if (/mismatch|backup/i.test(out)) {
+    console.log("\nSpotify was updated since the last patch — re-backing up the new client…");
+    applied = run(noRestart ? ["-n", "backup", "apply"] : ["backup", "apply"]);
+  }
+  if (applied.status !== 0) {
+    console.error(`\n\`spicetify ${applyArgs.join(" ")}\` failed (exit ${applied.status}).`);
     process.exit(1);
   }
 }

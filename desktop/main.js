@@ -74,6 +74,10 @@ function forkServer() {
       // updates — keep them in Electron's per-user data dir, not the bundle.
       DISTRO_CONNECTORS_PATH:
         process.env.DISTRO_CONNECTORS_PATH || path.join(app.getPath("userData"), "connectors.json"),
+      // The linked Spotify account (OAuth refresh token) equally belongs to
+      // the user, not the app bundle — one consent must outlive app updates.
+      DISTRO_SPOTIFY_ACCOUNT_PATH:
+        process.env.DISTRO_SPOTIFY_ACCOUNT_PATH || path.join(app.getPath("userData"), "spotify-account.json"),
     },
     stdio: "pipe",
     serviceName: "distro-finder-server",
@@ -350,6 +354,9 @@ function startBridgeLoops() {
     } else {
       brokenLinkBeats = 0;
     }
+    // A Spotify self-update also wipes the Spicetify companion — repair it
+    // automatically (guarded by its own cooldown; cheap FS checks otherwise).
+    maybeRepairCompanion().catch(() => {});
   };
   // The analyzer pump runs on its own cadence: it must feel instant in the
   // Spotify UI, but it is a single cheap evaluate when nothing is pending.
@@ -405,19 +412,26 @@ async function autoConnectAtStartup() {
 
 // ── Spicetify companion installer ───────────────────────────
 // Single implementation lives in scripts/install-spicetify.mjs; run it with
-// the bundled Node runtime so the menu action and the CLI stay identical.
-function installCompanion() {
+// the bundled Node runtime so the menu action, the CLI and the auto-repair
+// watchdog stay identical.
+function runCompanionInstaller(extraArgs = []) {
   const script = path.join(resourceRoot(), "scripts", "install-spicetify.mjs");
   const source = path.join(resourceRoot(), "spicetify", "distro-finder.js");
   const mapping = path.join(serverDir(), "json", "uuid's.json");
-  const proc = utilityProcess.fork(script, ["--source", source, "--mapping", mapping], {
-    stdio: "pipe",
-    serviceName: "spicetify-installer",
+  return new Promise((resolve) => {
+    const proc = utilityProcess.fork(script, ["--source", source, "--mapping", mapping, ...extraArgs], {
+      stdio: "pipe",
+      serviceName: "spicetify-installer",
+    });
+    let output = "";
+    proc.stdout?.on("data", (d) => (output += String(d)));
+    proc.stderr?.on("data", (d) => (output += String(d)));
+    proc.on("exit", (code) => resolve({ code, output }));
   });
-  let output = "";
-  proc.stdout?.on("data", (d) => (output += String(d)));
-  proc.stderr?.on("data", (d) => (output += String(d)));
-  proc.on("exit", (code) => {
+}
+
+function installCompanion() {
+  runCompanionInstaller().then(({ code, output }) => {
     dialog.showMessageBox(win, {
       type: code === 0 ? "info" : "error",
       title: "Spotify companion",
@@ -425,6 +439,70 @@ function installCompanion() {
       detail: output.trim().slice(-1500),
     });
   });
+}
+
+// ── Companion watchdog ──────────────────────────────────────
+// Spotify self-updates rewrite the client files (xpui.spa returns) and wipe
+// the Spicetify patch: the right-click panel and the in-Spotify analyzer
+// silently vanish. Detect that state and reinstall automatically — the user
+// asked for the whole pipeline to work with zero manual steps.
+function spotifyAppsDir() {
+  return path.join(process.env.APPDATA || "", "Spotify", "Apps");
+}
+
+/** True only when the companion WAS installed here and a Spotify update wiped it. */
+function companionWiped() {
+  try {
+    // Opt-in guard: never install on a machine where it was never set up.
+    const everInstalled = fs.existsSync(path.join(process.env.APPDATA || "", "spicetify", "Extensions", "distro-finder.js"));
+    if (!everInstalled) return false;
+    const apps = spotifyAppsDir();
+    if (!fs.existsSync(apps)) return false; // Spotify not installed
+    // Patched state = extracted xpui folder carrying our extension and no
+    // xpui.spa. An update restores an unpatched xpui.spa and/or drops the
+    // extension file from the extracted folder.
+    const spaRestored = fs.existsSync(path.join(apps, "xpui.spa"));
+    const extensionPresent = fs.existsSync(path.join(apps, "xpui", "extensions", "distro-finder.js"));
+    return spaRestored || !extensionPresent;
+  } catch {
+    return false;
+  }
+}
+
+let repairingCompanion = false;
+let lastCompanionRepairAt = 0;
+let companionRepairFailures = 0;
+async function maybeRepairCompanion() {
+  if (repairingCompanion) return;
+  if (companionRepairFailures >= 3) return; // a broken setup needs the menu action, not a loop
+  if (Date.now() - lastCompanionRepairAt < 15 * 60 * 1000) return;
+  if (!companionWiped()) { companionRepairFailures = 0; return; }
+  repairingCompanion = true;
+  lastCompanionRepairAt = Date.now();
+  console.log("[companion] Spotify update wiped the Spicetify patch — reinstalling automatically");
+  try {
+    // Patch with Spotify stopped so no file is locked mid-write, then bring it
+    // back with the app link enabled — same behavior as the existing
+    // link self-heal, which already restarts Spotify automatically.
+    const wasRunning = await bridge.isSpotifyRunning();
+    if (wasRunning) await bridge.killSpotify();
+    const { code, output } = await runCompanionInstaller(["--no-restart"]);
+    if (code === 0) {
+      companionRepairFailures = 0;
+      console.log("[companion] repaired:", output.trim().split("\n").pop());
+    } else {
+      companionRepairFailures++;
+      console.warn("[companion] auto-repair failed (exit", code + "):", output.trim().slice(-400));
+    }
+    if (wasRunning) {
+      // Restart even if patching failed — never leave the user with Spotify closed.
+      try { await bridge.launch(); } catch { /* beat self-heal retries */ }
+      lastKnownStatus = await reportBridgeStatus();
+      updateTrayStatus();
+    }
+  } finally {
+    repairingCompanion = false;
+  }
 }
 
 // ── Window ──────────────────────────────────────────────────
@@ -601,6 +679,9 @@ if (!gotLock) {
     // Spotify updates occasionally rewrite them.
     bridge.patchLaunchEntries().catch(() => {});
     autoConnectAtStartup();
+    // If Spotify updated itself while this app was not running, the companion
+    // is already gone at boot — check once right away, not only on the beat.
+    maybeRepairCompanion().catch(() => {});
   });
 
   // Tray keeps the app alive with every window closed — quit comes from the
