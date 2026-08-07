@@ -152,6 +152,29 @@ function run(args) {
   return r;
 }
 
+/**
+ * Put Spotify back the way it was.
+ *
+ * Patching rewrites Spotify's own app files. If `apply` fails halfway — an
+ * unsupported client version is the usual cause — the client is left broken,
+ * and the user did not sign up for that: an optional right-click menu must
+ * never cost someone their music player. Every failure path below restores.
+ */
+function restoreSpotify(why) {
+  console.error(`\n${why} — restoring Spotify to its unpatched state…`);
+  const r = run(["restore"]);
+  if (r.status === 0) console.error("Spotify restored. The in-app panel is not installed; everything else works.");
+  else console.error("Automatic restore failed. Run `spicetify restore` manually, or reinstall Spotify from spotify.com.");
+  return r.status === 0;
+}
+
+// `--restore`: undo everything and leave. Used by the app's repair action.
+if (process.argv.includes("--restore")) {
+  run(["config", "extensions", "distro-finder.js-"]);
+  const ok = restoreSpotify("Restore requested");
+  process.exit(ok ? 0 : 1);
+}
+
 const applyArgs = noRestart ? ["-n", "apply"] : ["apply"];
 const cfg = run(["config", "extensions", "distro-finder.js"]);
 if (cfg.status !== 0) {
@@ -170,7 +193,8 @@ if (applied.status !== 0) {
     applied = run(noRestart ? ["-n", "backup", "apply"] : ["backup", "apply"]);
   }
   if (applied.status !== 0) {
-    console.error(`\n\`spicetify ${applyArgs.join(" ")}\` failed (exit ${applied.status}).`);
+    // Do NOT leave a half-patched client behind.
+    restoreSpotify(`\`spicetify ${applyArgs.join(" ")}\` failed (exit ${applied.status})`);
     process.exit(1);
   }
 }

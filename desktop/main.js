@@ -339,6 +339,15 @@ function setupMarkerPath() {
   return path.join(app.getPath("userData"), "setup-done.json");
 }
 
+/** Undo the Spicetify patch, leaving Spotify exactly as it shipped. */
+async function restoreSpotifyPatch() {
+  const wasRunning = await bridge.isSpotifyRunning();
+  if (wasRunning) await bridge.killSpotify();
+  const { code, output } = await runCompanionInstaller(["--restore", "--no-restart"]);
+  console.log(code === 0 ? "[setup] Spotify restored" : `[setup] restore failed (${code}): ${output.trim().slice(-300)}`);
+  return { ok: code === 0, output };
+}
+
 async function firstRunSetup() {
   if (fs.existsSync(setupMarkerPath())) return;
   console.log("[setup] first run — preparing the Spotify integration");
@@ -356,7 +365,16 @@ async function firstRunSetup() {
       if (wasRunning) await bridge.killSpotify();
       const { code, output } = await runCompanionInstaller(["--no-restart"]);
       console.log(code === 0 ? "[setup] companion installed" : `[setup] companion install failed (${code}): ${output.trim().slice(-400)}`);
-      try { await bridge.launch(); } catch { /* the beat loop retries */ }
+
+      // Patching rewrites Spotify's own files. Prove the client still starts;
+      // if it does not, undo the patch rather than leave the user without a
+      // working Spotify for the sake of an optional right-click menu.
+      const launched = await bridge.launch().catch(() => ({ ok: false }));
+      if (code === 0 && !launched.ok) {
+        console.warn("[setup] Spotify did not come back after patching — rolling the patch back");
+        await restoreSpotifyPatch();
+        try { await bridge.launch(); } catch { /* the beat loop retries */ }
+      }
     }
 
     lastKnownStatus = await reportBridgeStatus();
@@ -512,6 +530,42 @@ function runCompanionInstaller(extraArgs = []) {
     proc.stderr?.on("data", (d) => (output += String(d)));
     proc.on("exit", (code) => resolve({ code, output }));
   });
+}
+
+/**
+ * User-facing escape hatch: put Spotify back to stock.
+ *
+ * If patching ever leaves the client broken (an unsupported Spotify version
+ * is the usual cause), this is the one-click way out — no terminal, no
+ * reinstall. The app keeps working; only the in-Spotify menu goes away.
+ */
+function repairSpotify() {
+  dialog
+    .showMessageBox(win, {
+      type: "question",
+      buttons: ["Restore Spotify", "Cancel"],
+      defaultId: 0,
+      cancelId: 1,
+      title: "Repair Spotify",
+      message: "Remove the in-Spotify right-click panel and restore Spotify to its original state?",
+      detail:
+        "Use this if Spotify stopped working or looks broken after installing the panel. " +
+        "Everything else in this app — link analysis, distributor lookups, analytics — keeps working.",
+    })
+    .then(async ({ response }) => {
+      if (response !== 0) return;
+      const { ok, output } = await restoreSpotifyPatch();
+      try { await bridge.launch(); } catch { /* the beat loop retries */ }
+      dialog.showMessageBox(win, {
+        type: ok ? "info" : "error",
+        title: "Repair Spotify",
+        message: ok ? "Spotify was restored and restarted." : "Automatic restore did not finish.",
+        detail: ok
+          ? "The right-click panel is gone. You can install it again from this menu at any time."
+          : `Open PowerShell and run: spicetify restore\n\nIf that fails, reinstall Spotify from spotify.com — your playlists live in your account, nothing is lost.\n\n${output.trim().slice(-600)}`,
+      });
+    })
+    .catch(() => {});
 }
 
 function installCompanion() {
@@ -713,6 +767,7 @@ function buildMenu() {
           { type: "separator" },
           { label: "Connect to Spotify (restarts it)", click: connectSpotify },
           { label: "Install right-click panel (Spicetify)", click: installCompanion },
+          { label: "Repair Spotify (remove the right-click panel)", click: repairSpotify },
           { type: "separator" },
           {
             label: "How it works",
