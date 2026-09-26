@@ -13,8 +13,21 @@ dosyalarında; geliştirme geçmişi ve "neden böyle" notları
 
 ## 0. Eski PC'den elle taşınacaklar (git'te YOK)
 
-Bunlar gizli bilgi ya da makineye özel veri olduğu için repoya girmez. USB,
-parola yöneticisi veya şifreli arşivle taşı, **asla** repoya commit'leme:
+Bunlar gizli bilgi ya da makineye özel veri olduğu için repoya girmez, **asla**
+commit'lenmez. Eski PC'de hepsi tek bir klasörde toplandı:
+
+```
+C:\ocean-development\usbiçin-df\
+  .env.local      ← anahtarlar + ADMIN_PASSWORD + APP_SECRET
+  .data\          ← history.json, connectors.json
+  BENI-OKU.txt
+```
+
+Bu klasörü Drive'a ya da USB'ye koy (Drive'da paylaşım linkini açma). Yeni PC'de
+aynı konuma, yani `C:\ocean-development\usbiçin-df\` altına indir. İçe aktarma
+3. adımda anlatılıyor.
+
+Ayrıntılı liste:
 
 | Dosya / klasör (eski PC) | Ne işe yarar | Zorunlu mu |
 |---|---|---|
@@ -80,8 +93,19 @@ git remote add desktop https://github.com/oceanyazilim/oceandistrofinder-desktop
 
 ## 3. Ortam değişkenleri (`.env.local`)
 
-Eski PC'den getirdiğin `.env.local` dosyasını proje köküne koy. Yoksa iki
-seçenek var:
+`usbiçin-df` klasörünü `C:\ocean-development\` altına koyduktan sonra şunu
+çalıştır:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/import-usb-secrets.ps1
+# klasör başka bir yerdeyse:  ... -Source "D:\usbiçin-df"
+```
+
+Script `.env.local` ve `.data\` dosyalarını proje köküne kopyalar. Projede
+zaten bir `.env.local` varsa önce onu `.bak` olarak yedekler. Sonunda hangi
+değişkenlerin dolu olduğunu **sadece adlarıyla** listeler, değerleri göstermez.
+
+Klasör elinde yoksa iki seçenek var:
 
 ```powershell
 # a) Etkileşimli: gizli değerleri ekrana yazmadan .env.local oluşturur

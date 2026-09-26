@@ -41,11 +41,16 @@ Kritik kurallar (eski oturumlardan):
 - Gizli değerler (.env.local) asla commit'lenmez, ekrana yazdırılmaz.
 
 İlk iş olarak:
-1. Ortamı doğrula: node -v, git status, .env.local var mı (değerlerini
-   gösterme, sadece hangi anahtarların dolu olduğunu söyle), npm test,
-   npm run typecheck.
-2. Eksik kalan kurulum adımı varsa KURULUM.md'ye göre söyle.
-3. Sonra ne üzerinde çalışacağımızı sor. Hafızadaki açık fikir:
+1. Gizli dosyaları içe aktar. Git'e girmeyen .env.local ve .data\ dosyaları
+   eski PC'den C:\ocean-development\usbiçin-df\ klasöründe geldi (Drive/USB).
+   Proje kökünde .env.local yoksa ve bu klasör varsa şunu çalıştır:
+   powershell -ExecutionPolicy Bypass -File scripts/import-usb-secrets.ps1
+   Klasör bulunamazsa nerede olduğunu bana sor. Değerleri asla okuma veya
+   yazdırma; script'in listelediği değişken adları yeterli.
+2. Ortamı doğrula: node -v, git status, .env.local'de hangi anahtarların dolu
+   olduğu (sadece adlar), npm install, npm test, npm run typecheck.
+3. Eksik kalan kurulum adımı varsa KURULUM.md'ye göre söyle.
+4. Sonra ne üzerinde çalışacağımızı sor. Hafızadaki açık fikir:
    companion watchdog'u, dosya durumuna ek olarak CDP üzerinden
    Spicetify.React (wrapper sağlığı) kontrol edecek şekilde genişletmek.
 
